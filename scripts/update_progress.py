@@ -14,6 +14,10 @@ except ModuleNotFoundError:
     from scripts.chapter_text import extract_body_section, is_chapter_file
 
 
+STATUS_IN_PROGRESS = "in_progress"
+STATUS_DONE = "done"
+
+
 def extract_body(content: str) -> str:
     return extract_body_section(content)
 
@@ -72,6 +76,21 @@ def update_todo_subsection(text: str, header: str, chapter_label: str, new_line:
     if new_line:
         suffix += new_line + "\n"
     return text.rstrip() + suffix
+
+
+def build_todo_line(
+    chapter_num: int,
+    chapter_title: str | None,
+    core_event: str | None = None,
+    word_count: int | None = None,
+    status: str = STATUS_IN_PROGRESS,
+) -> str:
+    title = chapter_title or "未命名章节"
+    detail = f" - {core_event}" if core_event else ""
+    if status == STATUS_DONE:
+        word_display = str(word_count) if word_count is not None else "?"
+        return f"- [x] 第{chapter_num}章：{title}{detail}（{word_display}字）"
+    return f"- [ ] 第{chapter_num}章：{title}{detail}"
 
 
 def update_recent_summaries(text: str, chapter_label: str, summary: str | None) -> str:
@@ -158,6 +177,7 @@ def update_chapter_plan_table(
     core_event: str | None,
     hook: str | None,
     word_count: int | None,
+    status_label: str,
 ) -> str:
     match = re.search(r"(?ms)(^## 章节规划\n\n\|.*?\n\|[-| ]+\n)(.*?)(?=^\n## |\Z)", text)
     if not match:
@@ -193,7 +213,7 @@ def update_chapter_plan_table(
                 cells[3] = hook
             if word_count is not None:
                 cells[4] = str(word_count)
-            cells[5] = "已完成"
+            cells[5] = status_label
             updated_rows.append("| " + " | ".join(cells[:6]) + " |")
         else:
             updated_rows.append(row)
@@ -208,7 +228,7 @@ def update_chapter_plan_table(
                     core_event or "",
                     hook or "",
                     str(word_count) if word_count is not None else "",
-                    "已完成",
+                    status_label,
                 ]
             )
             + " |"
@@ -262,6 +282,7 @@ def update_outline(
     hook: str | None,
     chapter_count: int,
     total_words: int,
+    status: str = STATUS_DONE,
 ) -> None:
     outline_path = project_dir / "docs" / "大纲.md"
     if not outline_path.exists():
@@ -269,14 +290,47 @@ def update_outline(
 
     text = outline_path.read_text(encoding="utf-8")
     chapter_label = f"第{chapter_num}章"
-    title = chapter_title or "未命名章节"
-    word_display = str(word_count) if word_count is not None else "?"
-    completed_line = f"- [x] {chapter_label}：{title}（{word_display}字）"
-
     text = update_todo_subsection(text, "待创作", chapter_label)
-    text = update_todo_subsection(text, "进行中", chapter_label)
-    text = update_todo_subsection(text, "已完成", chapter_label, completed_line)
-    text = update_chapter_plan_table(text, chapter_num, chapter_title, core_event, hook, word_count)
+    if status == STATUS_IN_PROGRESS:
+        text = update_todo_subsection(
+            text,
+            "进行中",
+            chapter_label,
+            build_todo_line(chapter_num, chapter_title, core_event=core_event, status=STATUS_IN_PROGRESS),
+        )
+        text = update_todo_subsection(text, "已完成", chapter_label)
+        text = update_chapter_plan_table(
+            text,
+            chapter_num,
+            chapter_title,
+            core_event,
+            hook,
+            word_count,
+            status_label="进行中",
+        )
+    else:
+        text = update_todo_subsection(text, "进行中", chapter_label)
+        text = update_todo_subsection(
+            text,
+            "已完成",
+            chapter_label,
+            build_todo_line(
+                chapter_num,
+                chapter_title,
+                core_event=core_event,
+                word_count=word_count,
+                status=STATUS_DONE,
+            ),
+        )
+        text = update_chapter_plan_table(
+            text,
+            chapter_num,
+            chapter_title,
+            core_event,
+            hook,
+            word_count,
+            status_label="已完成",
+        )
     text = re.sub(r"(?m)^- 已完成章节数：.*$", f"- 已完成章节数：{chapter_count} 章", text)
     text = re.sub(r"(?m)^- 累计字数：.*$", f"- 累计字数：{total_words} 字", text)
     planned_total = parse_planned_total(text)
@@ -284,7 +338,7 @@ def update_outline(
         progress = min(100, round(chapter_count / planned_total * 100))
         text = re.sub(r"(?m)^- 完成进度：.*$", f"- 完成进度：{progress}%", text)
 
-    if summary:
+    if summary and status == STATUS_DONE:
         text = upsert_outline_summary_section(text, chapter_num, chapter_title, summary)
 
     outline_path.write_text(text, encoding="utf-8")
@@ -304,6 +358,7 @@ def update_progress(
     protagonist_state: str | None = None,
     stage: str | None = None,
     plot_note: str | None = None,
+    status: str = STATUS_DONE,
 ) -> None:
     project_dir = Path(project_path).expanduser().resolve()
     log_path = project_dir / "task_log.md"
@@ -321,9 +376,14 @@ def update_progress(
         chapter_count = max(chapter_count, 1)
 
     content = update_field(content, "创作阶段：", stage or "正文创作中")
-    content = update_field(content, "最新章节：", latest_chapter)
-    content = update_field(content, "累计完成章节：", str(max(chapter_count, chapter_num)))
-    content = update_field(content, "累计完成字数：", str(total_words))
+    content = update_field(content, "当前处理章节：", latest_chapter if status == STATUS_IN_PROGRESS else "无")
+    if status == STATUS_DONE:
+        content = update_field(content, "最新章节：", latest_chapter)
+        content = update_field(content, "累计完成章节：", str(max(chapter_count, chapter_num)))
+        content = update_field(content, "累计完成字数：", str(total_words))
+    else:
+        content = update_field(content, "累计完成章节：", str(chapter_count))
+        content = update_field(content, "累计完成字数：", str(total_words))
 
     if next_goal:
         content = update_field(content, "下一章目标：", next_goal)
@@ -334,8 +394,9 @@ def update_progress(
     if protagonist_state:
         content = update_field(content, "主角状态：", protagonist_state)
 
-    content = update_recent_summaries(content, latest_chapter, summary)
-    content = update_task_log_active_plots(content, plot_note, chapter_label)
+    if status == STATUS_DONE:
+        content = update_recent_summaries(content, latest_chapter, summary)
+        content = update_task_log_active_plots(content, plot_note, chapter_label)
     log_path.write_text(content, encoding="utf-8")
     update_outline(
         project_dir,
@@ -345,14 +406,16 @@ def update_progress(
         word_count,
         core_event,
         hook,
-        max(chapter_count, chapter_num),
+        max(chapter_count, chapter_num) if status == STATUS_DONE else chapter_count,
         total_words,
+        status=status,
     )
 
-    if plot_note:
+    if plot_note and status == STATUS_DONE:
         append_plot_note(project_dir, plot_note, chapter_label)
 
-    print(f"进度已更新：{latest_chapter}，累计 {total_words} 字")
+    action = "进入创作中" if status == STATUS_IN_PROGRESS else f"已完成，累计 {total_words} 字"
+    print(f"进度已更新：{latest_chapter}，{action}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -370,6 +433,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--protagonist-state", help="主角状态")
     parser.add_argument("--stage", help="创作阶段")
     parser.add_argument("--plot-note", help="新增伏笔备注")
+    parser.add_argument(
+        "--status",
+        choices=(STATUS_IN_PROGRESS, STATUS_DONE),
+        default=STATUS_DONE,
+        help="更新状态：进行中或已完成",
+    )
     return parser.parse_args()
 
 
@@ -389,4 +458,5 @@ if __name__ == "__main__":
         protagonist_state=args.protagonist_state,
         stage=args.stage,
         plot_note=args.plot_note,
+        status=args.status,
     )

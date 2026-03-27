@@ -26,6 +26,7 @@ def build_task_log(project_name: str) -> str:
 - 创作阶段：规划中
 - 书名：{project_name}
 - 最新章节：无
+- 当前处理章节：无
 - 当前视角：
 - 主角位置：
 - 主角状态：
@@ -182,8 +183,49 @@ def build_timeline_template() -> str:
 
 ## 第一卷
 
-| 时间点 | 事件 | 章节 |
-|--------|------|------|
+| 时间点/章节 | 事件节点 | 配角出场/情感转折 | 主角变化 | 备注 |
+|-------------|----------|------------------|----------|------|
+"""
+
+
+def build_relationship_map_template() -> str:
+    return """# 关系图
+
+## 当前关系图谱
+| 角色A | 角色B | 当前关系 | 隐性张力 | 变化方向 |
+|------|------|----------|----------|----------|
+
+## 高风险关系检查
+- 是否存在合作与敌对并存的关系：
+- 是否存在误解、依赖、利用或情感债：
+- 这些关系会在第几卷/第几阶段发生变化：
+"""
+
+
+def build_ensemble_theme_template() -> str:
+    return """# 群像主题拆分
+
+## 主主题
+- 这部作品最终想回答什么问题：
+
+## 角色/阵营主题线
+| 角色/阵营 | 主题命题 | 当前阶段 | 与主线关系 |
+|-----------|----------|----------|------------|
+
+## 轮转原则
+- 哪条线负责主推进：
+- 哪条线负责映照或对冲：
+- 哪些角色不能长期只围着主角转：
+"""
+
+
+def build_pov_rotation_template() -> str:
+    return """# POV轮转表
+
+| 章节 | 主POV | 次POV（可选） | 主线任务 | 备注 |
+|------|-------|---------------|----------|------|
+| 第1章 | | | | |
+| 第2章 | | | | |
 """
 
 
@@ -194,7 +236,14 @@ def write_file(path: Path, content: str, force: bool) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def create_novel_project(project_name: str, target_dir: str | None = None, force: bool = False) -> Path:
+def create_novel_project(
+    project_name: str,
+    target_dir: str | None = None,
+    force: bool = False,
+    mode: str = "single",
+    complex_relationships: bool = False,
+    romance_focus: bool = False,
+) -> Path:
     base_dir = Path(target_dir).expanduser().resolve() if target_dir else Path.cwd()
     project_dir = base_dir / project_name
 
@@ -216,6 +265,13 @@ def create_novel_project(project_name: str, target_dir: str | None = None, force
         project_dir / "task_log.md": build_task_log(project_name),
     }
 
+    if mode in {"dual", "ensemble"}:
+        files[project_dir / "docs" / "群像主题拆分.md"] = build_ensemble_theme_template()
+        files[project_dir / "plot" / "POV轮转表.md"] = build_pov_rotation_template()
+
+    if complex_relationships or romance_focus:
+        files[project_dir / "docs" / "关系图.md"] = build_relationship_map_template()
+
     for path, content in files.items():
         write_file(path, content, force=force)
 
@@ -227,10 +283,25 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="创建长篇小说项目结构")
     parser.add_argument("project_name", nargs="?", default="my-novel", help="项目目录名")
     parser.add_argument("--target-dir", help="项目创建到哪个目录下，默认当前目录")
+    parser.add_argument(
+        "--mode",
+        choices=("single", "dual", "ensemble"),
+        default="single",
+        help="项目模式：单主角、双主角或群像",
+    )
+    parser.add_argument("--complex-relationships", action="store_true", help="创建关系图模板")
+    parser.add_argument("--romance-focus", action="store_true", help="感情线重要时创建关系图模板")
     parser.add_argument("--force", action="store_true", help="覆盖已存在的模板文件")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    create_novel_project(args.project_name, target_dir=args.target_dir, force=args.force)
+    create_novel_project(
+        args.project_name,
+        target_dir=args.target_dir,
+        force=args.force,
+        mode=args.mode,
+        complex_relationships=args.complex_relationships,
+        romance_focus=args.romance_focus,
+    )
