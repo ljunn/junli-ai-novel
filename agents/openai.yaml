@@ -1,4 +1,4 @@
 interface:
-  display_name: "长篇小说创作"
-  short_description: "长篇连载小说的主线规划、续写、记忆维护与章节质检工作流"
-  default_prompt: "Use $junli-ai-novel 帮我规划、优化主线，或续写一个带项目记忆文件的长篇小说工程。"
+  display_name: "长篇网文连载"
+  short_description: "平台向长篇网文的立项、续写、记忆维护与章节质检工作流"
+  default_prompt: "Use $junli-ai-novel 帮我规划平台向长篇网文主线、优化追读与卖点兑现，或续写一个带项目记忆文件的网文工程。"
