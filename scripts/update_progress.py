@@ -357,6 +357,12 @@ def update_progress(
     protagonist_location: str | None = None,
     protagonist_state: str | None = None,
     stage: str | None = None,
+    target_total_words: str | None = None,
+    target_volumes: str | None = None,
+    current_volume: str | None = None,
+    current_phase: str | None = None,
+    phase_goal: str | None = None,
+    pending_setting_sync: str | None = None,
     plot_note: str | None = None,
     status: str = STATUS_DONE,
 ) -> None:
@@ -393,6 +399,18 @@ def update_progress(
         content = update_field(content, "主角位置：", protagonist_location)
     if protagonist_state:
         content = update_field(content, "主角状态：", protagonist_state)
+    if target_total_words is not None:
+        content = update_field(content, "目标总字数：", str(target_total_words))
+    if target_volumes is not None:
+        content = update_field(content, "目标卷数：", str(target_volumes))
+    if current_volume is not None:
+        content = update_field(content, "当前卷：", current_volume)
+    if current_phase is not None:
+        content = update_field(content, "当前阶段：", current_phase)
+    if phase_goal is not None:
+        content = update_field(content, "当前阶段目标：", phase_goal)
+    if pending_setting_sync is not None:
+        content = update_field(content, "设定变更待同步：", pending_setting_sync)
 
     if status == STATUS_DONE:
         content = update_recent_summaries(content, latest_chapter, summary)
@@ -418,6 +436,45 @@ def update_progress(
     print(f"进度已更新：{latest_chapter}，{action}")
 
 
+def update_governance_state(
+    project_path: str,
+    *,
+    target_total_words: str | None = None,
+    target_volumes: str | None = None,
+    current_volume: str | None = None,
+    current_phase: str | None = None,
+    phase_goal: str | None = None,
+    pending_setting_sync: str | None = None,
+    clear_pending_setting_sync: bool = False,
+) -> None:
+    project_dir = Path(project_path).expanduser().resolve()
+    log_path = project_dir / "task_log.md"
+
+    if not log_path.exists():
+        raise FileNotFoundError(f"未找到 task_log.md: {log_path}")
+
+    content = log_path.read_text(encoding="utf-8")
+
+    if target_total_words is not None:
+        content = update_field(content, "目标总字数：", str(target_total_words))
+    if target_volumes is not None:
+        content = update_field(content, "目标卷数：", str(target_volumes))
+    if current_volume is not None:
+        content = update_field(content, "当前卷：", current_volume)
+    if current_phase is not None:
+        content = update_field(content, "当前阶段：", current_phase)
+    if phase_goal is not None:
+        content = update_field(content, "当前阶段目标：", phase_goal)
+
+    if clear_pending_setting_sync:
+        content = update_field(content, "设定变更待同步：", "无")
+    elif pending_setting_sync is not None:
+        content = update_field(content, "设定变更待同步：", pending_setting_sync)
+
+    log_path.write_text(content, encoding="utf-8")
+    print(f"长篇治理状态已更新：{project_dir}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="更新小说项目进度")
     parser.add_argument("project_path", help="项目根目录")
@@ -432,6 +489,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--protagonist-location", help="主角位置")
     parser.add_argument("--protagonist-state", help="主角状态")
     parser.add_argument("--stage", help="创作阶段")
+    parser.add_argument("--target-total-words", help="目标总字数，例如 3000000 或 300万")
+    parser.add_argument("--target-volumes", help="目标卷数")
+    parser.add_argument("--current-volume", help="当前卷，例如 第一卷")
+    parser.add_argument("--current-phase", help="当前阶段，例如 阶段1")
+    parser.add_argument("--phase-goal", help="当前阶段目标")
+    parser.add_argument("--pending-setting-sync", help="待同步的设定变更摘要")
     parser.add_argument("--plot-note", help="新增伏笔备注")
     parser.add_argument(
         "--status",
@@ -457,6 +520,12 @@ if __name__ == "__main__":
         protagonist_location=args.protagonist_location,
         protagonist_state=args.protagonist_state,
         stage=args.stage,
+        target_total_words=args.target_total_words,
+        target_volumes=args.target_volumes,
+        current_volume=args.current_volume,
+        current_phase=args.current_phase,
+        phase_goal=args.phase_goal,
+        pending_setting_sync=args.pending_setting_sync,
         plot_note=args.plot_note,
         status=args.status,
     )
