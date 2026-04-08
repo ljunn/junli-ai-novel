@@ -19,7 +19,7 @@ try:
     from check_chapter_wordcount import check_chapter
     from check_emotion_curve import analyze_chapter_emotion_curve
     from extract_thrills import analyze_thrills_and_poisons
-    from new_project import create_novel_project, ensure_longform_governance_files
+    from new_project import create_novel_project, ensure_longform_governance_files, load_template
     from update_progress import (
         STATUS_DONE,
         STATUS_IN_PROGRESS,
@@ -32,7 +32,7 @@ except ModuleNotFoundError:
     from scripts.check_chapter_wordcount import check_chapter
     from scripts.check_emotion_curve import analyze_chapter_emotion_curve
     from scripts.extract_thrills import analyze_thrills_and_poisons
-    from scripts.new_project import create_novel_project, ensure_longform_governance_files
+    from scripts.new_project import create_novel_project, ensure_longform_governance_files, load_template
     from scripts.update_progress import (
         STATUS_DONE,
         STATUS_IN_PROGRESS,
@@ -170,6 +170,25 @@ def update_task_log_audit(project_dir: Path, scope: str, status: str, summary_li
     task_log_path.write_text(text, encoding="utf-8")
 
 
+def update_task_log_bootstrap_state(
+    project_dir: Path,
+    *,
+    stage: str,
+    next_goal: str,
+    protagonist_state: str,
+    book_title: str,
+) -> None:
+    task_log_path = project_dir / "task_log.md"
+    if not task_log_path.exists():
+        return
+    text = task_log_path.read_text(encoding="utf-8")
+    text = task_log_update_field(text, "创作阶段：", stage)
+    text = task_log_update_field(text, "书名：", book_title)
+    text = task_log_update_field(text, "下一章目标：", next_goal)
+    text = task_log_update_field(text, "主角状态：", protagonist_state)
+    task_log_path.write_text(text, encoding="utf-8")
+
+
 def requires_longform_governance(project_dir: Path, summary: dict) -> bool:
     chapter_count, total_words = compute_manuscript_stats(project_dir)
     target_words = parse_count_value(summary.get("planned_total_words", ""))
@@ -206,6 +225,7 @@ def summarize_project(project_dir: Path) -> dict:
     return {
         "project_dir": str(project_dir),
         "missing_files": collect_missing_memory_files(project_dir),
+        "book_title": extract_state_field(task_log, "书名：", project_dir.name),
         "stage": extract_state_field(task_log, "创作阶段：", "未知"),
         "latest_chapter": extract_state_field(task_log, "最新章节：", "无"),
         "current_chapter": extract_state_field(task_log, "当前处理章节：", "无"),
@@ -262,6 +282,247 @@ def read_guidance(args: argparse.Namespace) -> str:
         if file_text:
             return file_text
     return guidance
+
+
+def write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content.rstrip() + "\n", encoding="utf-8")
+
+
+def upsert_markdown_field(text: str, label: str, value: str) -> str:
+    pattern = rf"(?m)^- \*\*{re.escape(label)}\*\*：.*$"
+    replacement = f"- **{label}**：{value}"
+    if re.search(pattern, text):
+        return re.sub(pattern, replacement, text, count=1)
+    return text
+
+
+def set_plain_bullet(text: str, label: str, value: str) -> str:
+    pattern = rf"(?m)^- {re.escape(label)}.*$"
+    replacement = f"- {label}{value}"
+    if re.search(pattern, text):
+        return re.sub(pattern, replacement, text, count=1)
+    return text
+
+
+def infer_outline_buckets(genre: str) -> dict[str, str]:
+    genre = genre.strip().lower()
+    if genre in {"玄幻", "xuanhuan", "仙侠", "xianxia", "修仙"}:
+        return {
+            "world_basis": "高压等级体系 + 资源稀缺 + 明确法则代价",
+            "power_system": "境界、资源、资格三线并进",
+            "phase_one": "先立住处境与规则压制",
+            "phase_two": "拿到第一批资源与身份资格",
+        }
+    if genre in {"都市", "urban", "现实", "商战"}:
+        return {
+            "world_basis": "现实秩序 + 行业规则 + 圈层壁垒",
+            "power_system": "信息、资源、人脉与身份位阶并进",
+            "phase_one": "先立住现实困境与关系失衡",
+            "phase_two": "拿到第一轮反制筹码",
+        }
+    if genre in {"科幻", "sci-fi", "赛博"}:
+        return {
+            "world_basis": "技术边界 + 制度压力 + 资源垄断",
+            "power_system": "技术、权限、资源、认知并进",
+            "phase_one": "先立住异常现象与制度阻力",
+            "phase_two": "拿到第一轮技术/权限突破口",
+        }
+    return {
+        "world_basis": "世界规则清楚、冲突土壤明确、成长代价可见",
+        "power_system": "能力、资源、关系三线并进",
+        "phase_one": "先立住主角处境与主问题",
+        "phase_two": "拿到第一轮破局筹码",
+    }
+
+
+def generate_story_bible_drafts(
+    *,
+    book_title: str,
+    genre: str,
+    premise: str,
+    protagonist: str,
+    core_conflict: str,
+    target_words: str | None = None,
+) -> dict[str, str]:
+    target_words = target_words or "300万字"
+    buckets = infer_outline_buckets(genre)
+
+    worldview = f"""# 世界观
+
+## 前台逻辑层级
+- 当前主要由哪一层逻辑驱动：人物欲望与规则压力共同驱动
+- 其他层级如何作为背景支撑：用资源、制度、历史积怨持续给主线加压
+
+## 题材基石
+- 当前题材更偏：{genre}
+- 这一题材最需要优先研究或搭牢的规则：{buckets['world_basis']}
+
+## 空间尺度
+- 当前故事主要发生在哪个尺度：从主角当前生存圈层起步，逐步外扩
+- 暂时不展开的更大空间：更高位阶势力与更高层规则
+- 当前更适合：先扩展再升级
+- 当前世界更偏：局部封闭，远处开放
+
+## 自然层
+
+### 自然形态
+- 地理环境：围绕主角眼下最有压迫感的生存环境建立
+- 关键资源：推动成长与争夺的核心筹码
+- 生命形态：符合题材调性的主要生命/势力形态
+
+### 自然规则
+- 底层铁律：任何突破都必须付出代价
+- 可突破的表层规则：身份、资源、权限、认知门槛
+- 打破表层规则的代价：会引来更高层反制或新的风险
+
+## 文明层
+
+### 文明形态
+- 势力结构：围绕核心冲突形成压制方、受益方、夹层者
+- 社会结构：资源与资格分配明显不均
+- 制度与工具：服务于权力与控制
+
+### 文明规则
+- 权力逻辑：谁掌控资源，谁定义秩序
+- 分配逻辑：稀缺资源按身份/能力/关系分配
+- 价值观排序：效率、利益、存续、忠诚与野心长期冲突
+- 禁忌：主角最可能踩中的高风险红线
+
+## 历史沉淀
+- 旧战争 / 旧站队 / 旧恩怨：为当前冲突提供前史燃料
+- 这些历史如何塑造今天：让现实困境不是偶发，而是系统结果
+
+## 动态循环
+- 自然如何限制文明：底层规则决定上层秩序不能无限扩张
+- 文明如何改造自然：资源开发与秩序重构不断加压
+- 当前系统最脆弱的地方：主角最可能打穿的裂缝
+
+## 从世界生长出的故事
+- 最稀缺的资源/名额：与核心冲突直接绑定的关键资源
+- 谁在控制它：当前压制主角的一方
+- 谁被排除在外：主角与同类弱势者
+- 主角当前站位：{protagonist}
+- 主角一旦打破规则，世界会如何反应：围堵、拉拢、追杀、改写秩序
+- 升级或成长的代价与天花板：每进一步都伴随更高风险
+"""
+
+    rules = f"""# 法则
+
+## 境界 / 等级体系
+- 题材：{genre}
+- 建议主轴：{buckets['power_system']}
+- 当前阶段只开放第一层级，不要一开始把高阶规则全说完
+
+## 能力限制
+- 任何优势都必须有适用范围
+- 任何越级都必须支付真实代价
+- 任何关键能力都要有失败条件
+
+## 冲突红线
+- 主角不能无成本打穿底层规则
+- 配角不能集体降智抬主角
+- 新规则不能只为当前一章临时服务
+
+## 不可违背规则
+- 冲突必须能追溯到资源、规则、关系或历史
+- 重要判断必须能回溯到已给出的线索
+- 结尾不能用总结句偷代价与后果
+"""
+
+    characters = f"""# 人物档案
+
+## 主角
+
+### 主角
+- **年龄/职业**：待定
+- **外貌特征**：与题材和处境相匹配
+- **性格核心**：{protagonist}
+- **主性格**：有明确缺口，不完美但可持续推进剧情
+- **记忆点性格**：兼具反差和长期成长空间
+- **外貌锚点**：留 1-2 个可重复识别的细节
+- **核心价值观**：与主线命题强相关
+- **最大恐惧**：失去最想守住的东西
+- **致命缺陷**：会在中段造成重大误判
+- **内心渴望**：不只想赢，还想证明/守住/改变某件事
+- **背景故事**：和当前困境直接相连
+- **成长目标**：从当前缺口走向终局变化
+- **原型参考（仅作者侧）**：可后补
+- **MBTI:** 可后补
+
+## 反派
+
+### 核心阻碍者
+- **主性格**：当前秩序的受益者或执行者
+- **价值观**：与主角形成镜像冲突
+- **最强筹码**：规则、资源、身份或认知优势
+- **致命盲区**：未来被主角利用的裂缝
+
+## 配角
+
+### 关键同盟 / 对照人物
+- **功能**：映照主角、制造关系张力、提供阶段性转机或误导
+- **禁止写法**：不要只围着主角打转
+"""
+
+    constitution = f"""# 全书宪法
+
+## 项目定位
+- 题材赛道：{genre}
+- 目标平台：平台向长篇网文
+- 目标读者：追求持续追读与阶段兑现的连载读者
+- 核心卖点：{premise}
+- 禁区与高风险项：不靠擦边、影射、无代价全能推进
+
+## 全书终局
+- 最终抵达的结果：主角解决主线冲突并完成长期变化
+- 主角最终赢什么 / 失去什么：围绕 {core_conflict} 做结算
+- 终局必须兑现的主命题：困境不是偶发，而是必须被打穿的结构性问题
+- 绝对不能丢的结局锚点：主角必须付出代价后才完成终局
+
+## 主角长期弧线
+- 开局核心缺口：性格、处境或认知上存在明显短板
+- 中段必须经历的关键误判 / 崩塌：成长不能一帆风顺
+- 后段必须完成的认知跃迁：从个人破局走向更大格局
+- 终局人物状态：与开局形成清晰对照
+
+## 世界与法则宪法
+- 绝对不可违背的底层规则：任何强推进都必须付代价
+- 可以升级但不能推翻的表层规则：身份、资源、权限、势力格局
+- 战力 / 权力 / 资源增长的硬上限：不能无成本直升
+- 每次越级或破格推进必须支付的代价：失去筹码、暴露底牌、关系破裂或引来更高层反制
+"""
+
+    outline = load_template("outline-template.md", "# 大纲\n").replace("[小说名称]", book_title)
+    outline = upsert_markdown_field(outline, "题材", genre)
+    outline = upsert_markdown_field(outline, "核心冲突", core_conflict)
+    outline = upsert_markdown_field(outline, "主线一句话", premise)
+    outline = upsert_markdown_field(outline, "问题起点", premise)
+    outline = upsert_markdown_field(outline, "主角动作", "围绕核心冲突做出第一轮主动破局")
+    outline = upsert_markdown_field(outline, "中途变数", "更高层规则、旧恩怨和关系误判逐步加压")
+    outline = upsert_markdown_field(outline, "结果改变", "主角解决旧问题，但被推入更高阶段")
+    outline = upsert_markdown_field(outline, "整合梗概", f"{book_title}：{premise} 主角以“{protagonist}”的方式闯入核心冲突“{core_conflict}”，从当前处境一路破局，并在长篇推进中不断付出代价、改写规则。")
+    outline = upsert_markdown_field(outline, "最终目标", "解决主线冲突，并改变自身与所处秩序")
+    outline = upsert_markdown_field(outline, "核心欲望", protagonist)
+    outline = upsert_markdown_field(outline, "失败代价", "失去最想守住的东西，并被秩序彻底压死")
+    outline = upsert_markdown_field(outline, "角色变化方向", "从当下缺口走向终局变化")
+    outline = upsert_markdown_field(outline, "核心意外", premise)
+    outline = upsert_markdown_field(outline, "不可逆变化", "主角被迫离开原有安全区")
+    outline = upsert_markdown_field(outline, "立即任务", "先活下来并找出第一轮破局点")
+    outline = upsert_markdown_field(outline, "全书结局", "围绕核心冲突完成主线结算")
+    outline = upsert_markdown_field(outline, "终极对手/终极阻碍", "当前秩序中最难撼动的压制力量")
+    outline = upsert_markdown_field(outline, "终极胜利方式", "靠前期铺路的资源、认知、关系与代价完成反转")
+    outline = upsert_markdown_field(outline, "终局代价", "必须失去一部分筹码或关系")
+    outline = upsert_markdown_field(outline, "第一卷锚点", buckets["phase_two"])
+    outline = upsert_markdown_field(outline, "为第一卷锚点铺路的事件链", buckets["phase_one"])
+
+    return {
+        "worldview": worldview,
+        "rules": rules,
+        "characters": characters,
+        "constitution": constitution,
+        "outline": outline,
+    }
 
 
 def first_meaningful_value(*values: str | None) -> str | None:
@@ -1123,6 +1384,67 @@ def handle_governance(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_bootstrap_story(args: argparse.Namespace) -> int:
+    project_dir = Path(args.project_path).expanduser().resolve()
+    existing_summary = summarize_project(project_dir)
+    book_title = args.book_title or existing_summary.get("book_title") or project_dir.name
+    premise = (args.premise or "").strip()
+    protagonist = (args.protagonist or "").strip()
+    core_conflict = (args.core_conflict or "").strip()
+    genre = (args.genre or "").strip()
+
+    if not premise:
+        raise ValueError("bootstrap-story 必须提供 --premise")
+    if not protagonist:
+        raise ValueError("bootstrap-story 必须提供 --protagonist")
+    if not core_conflict:
+        raise ValueError("bootstrap-story 必须提供 --core-conflict")
+    if not genre:
+        raise ValueError("bootstrap-story 必须提供 --genre")
+
+    drafts = generate_story_bible_drafts(
+        book_title=book_title,
+        genre=genre,
+        premise=premise,
+        protagonist=protagonist,
+        core_conflict=core_conflict,
+        target_words=args.target_total_words,
+    )
+
+    write_text(project_dir / "docs" / "世界观.md", drafts["worldview"])
+    write_text(project_dir / "docs" / "法则.md", drafts["rules"])
+    write_text(project_dir / "characters" / "人物档案.md", drafts["characters"])
+    write_text(project_dir / "docs" / "全书宪法.md", drafts["constitution"])
+    write_text(project_dir / "docs" / "大纲.md", drafts["outline"])
+
+    update_governance_state(
+        str(project_dir),
+        target_total_words=args.target_total_words,
+        current_volume=args.current_volume or "第一卷",
+        current_phase=args.current_phase or "阶段1",
+        phase_goal=args.phase_goal or "先立住主线、世界规则与主角处境",
+    )
+    update_task_log_bootstrap_state(
+        project_dir,
+        stage="规划完成，待进入首章编排",
+        next_goal="进入第1章，立住主角困境、规则压力和核心问题",
+        protagonist_state=protagonist,
+        book_title=book_title,
+    )
+
+    summary = summarize_project(project_dir)
+    print_resume_summary(summary)
+    print("\n" + "=" * 60)
+    print("首轮设定草稿已生成")
+    print("=" * 60)
+    print(f"- 世界观: {project_dir / 'docs' / '世界观.md'}")
+    print(f"- 法则: {project_dir / 'docs' / '法则.md'}")
+    print(f"- 人物档案: {project_dir / 'characters' / '人物档案.md'}")
+    print(f"- 全书宪法: {project_dir / 'docs' / '全书宪法.md'}")
+    print(f"- 大纲: {project_dir / 'docs' / '大纲.md'}")
+    return 0
+
+
 def build_audit_payload(project_dir: Path, scope: str) -> tuple[dict, list[str], list[str], tuple[int, int]]:
     summary = summarize_project(project_dir)
     chapter_count, total_words = compute_manuscript_stats(project_dir)
@@ -1234,6 +1556,19 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser.add_argument("project_path", help="项目根目录")
     bootstrap_parser.add_argument("--force", action="store_true", help="覆盖已存在的治理文件")
     bootstrap_parser.set_defaults(handler=handle_bootstrap_longform)
+
+    bootstrap_story_parser = subparsers.add_parser("bootstrap-story", help="生成首轮世界观/法则/人物/大纲草稿")
+    bootstrap_story_parser.add_argument("project_path", help="项目根目录")
+    bootstrap_story_parser.add_argument("--book-title", help="书名；默认取项目目录名")
+    bootstrap_story_parser.add_argument("--genre", required=True, help="题材，例如 玄幻 / 都市 / 科幻")
+    bootstrap_story_parser.add_argument("--premise", required=True, help="一句话脑洞或故事前提")
+    bootstrap_story_parser.add_argument("--protagonist", required=True, help="主角核心性格或处境关键词")
+    bootstrap_story_parser.add_argument("--core-conflict", required=True, help="核心冲突")
+    bootstrap_story_parser.add_argument("--target-total-words", help="目标总字数，例如 300万字")
+    bootstrap_story_parser.add_argument("--current-volume", help="初始化当前卷，默认 第一卷")
+    bootstrap_story_parser.add_argument("--current-phase", help="初始化当前阶段，默认 阶段1")
+    bootstrap_story_parser.add_argument("--phase-goal", help="初始化当前阶段目标")
+    bootstrap_story_parser.set_defaults(handler=handle_bootstrap_story)
 
     plan_parser = subparsers.add_parser("plan", help="生成本章意图文件")
     plan_parser.add_argument("project_path", help="项目根目录")

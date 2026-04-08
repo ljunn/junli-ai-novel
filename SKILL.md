@@ -99,6 +99,7 @@ python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume "
 ```bash
 python3 scripts/chapter_pipeline.py init --target-dir "<项目目录>" --book-title "书名"
 python3 scripts/chapter_pipeline.py init "项目目录名" --target-dir "<上级目录>" --subdir --book-title "书名"
+python3 scripts/chapter_pipeline.py bootstrap-story "<项目目录>" --genre "<题材>" --premise "<一句话脑洞>" --protagonist "<主角关键词>" --core-conflict "<核心冲突>"
 ```
 
 `init` 必须显式传 `--target-dir`，不要依赖当前目录。
@@ -231,6 +232,7 @@ python3 scripts/chapter_pipeline.py init "项目目录名" --target-dir "<上级
 ```bash
 python3 scripts/chapter_pipeline.py init ...
 python3 scripts/chapter_pipeline.py bootstrap-longform <项目目录>
+python3 scripts/chapter_pipeline.py bootstrap-story <项目目录> --genre ... --premise ... --protagonist ... --core-conflict ...
 python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume ... --current-phase ... --phase-goal ...
 python3 scripts/chapter_pipeline.py preflight <项目目录>
 python3 scripts/chapter_pipeline.py resume <项目目录>
