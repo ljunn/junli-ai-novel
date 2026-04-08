@@ -941,7 +941,7 @@ def handle_init(args: argparse.Namespace) -> int:
         mode=args.mode,
         complex_relationships=args.complex_relationships,
         romance_focus=args.romance_focus,
-        in_place=args.in_place,
+        in_place=not args.subdir,
     )
     return 0
 
@@ -1215,10 +1215,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="初始化小说项目")
-    init_parser.add_argument("project_name", nargs="?", help="项目目录名；使用 --in-place 时可不传")
-    init_parser.add_argument("--book-title", help="书名；默认与项目目录名相同，或原地初始化时取当前目录名")
+    init_parser.add_argument("project_name", nargs="?", help="项目目录名；默认原地初始化时可不传，使用 --subdir 时作为子目录名")
+    init_parser.add_argument("--book-title", help="书名；默认取 project_name，原地初始化且未传时取当前目录名")
     init_parser.add_argument("--target-dir", help="项目创建目录，默认当前目录")
-    init_parser.add_argument("--in-place", action="store_true", help="直接在目标目录/当前目录初始化，不额外创建子目录")
+    init_parser.add_argument("--in-place", action="store_true", default=True, help="直接在目标目录/当前目录初始化（默认行为）")
+    init_parser.add_argument("--subdir", action="store_true", help="在目标目录下额外创建一个子目录作为项目根目录")
     init_parser.add_argument("--mode", choices=("single", "dual", "ensemble"), default="single")
     init_parser.add_argument("--complex-relationships", action="store_true", help="创建关系图模板")
     init_parser.add_argument("--romance-focus", action="store_true", help="感情线重要时创建关系图模板")
