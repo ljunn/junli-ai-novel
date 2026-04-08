@@ -514,12 +514,9 @@ def create_novel_project(
     in_place: bool = True,
     book_title: str | None = None,
 ) -> Path:
-    base_dir = Path(target_dir).expanduser().resolve() if target_dir else Path.cwd()
-    if target_dir is None and is_within(base_dir, ROOT_DIR):
-        raise ValueError(
-            "当前目录位于 skill 安装目录内。为避免误写入，请显式传 --target-dir 指向你的小说项目目录，"
-            "或先切换到目标项目目录再执行 init。"
-        )
+    if not target_dir:
+        raise ValueError("init 必须显式传 --target-dir，不能依赖当前目录。")
+    base_dir = Path(target_dir).expanduser().resolve()
     if in_place:
         project_dir = base_dir
         resolved_book_title = book_title or project_name or project_dir.name
@@ -568,7 +565,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="创建长篇小说项目结构")
     parser.add_argument("project_name", nargs="?", help="项目目录名；默认原地初始化时可不传，使用 --subdir 时作为子目录名")
     parser.add_argument("--book-title", help="书名；默认取 project_name，原地初始化且未传时取当前目录名")
-    parser.add_argument("--target-dir", help="项目创建到哪个目录下，默认当前目录")
+    parser.add_argument("--target-dir", required=True, help="目标项目目录；必须显式传入")
     parser.add_argument("--in-place", action="store_true", default=True, help="直接在目标目录/当前目录初始化（默认行为）")
     parser.add_argument("--subdir", action="store_true", help="在目标目录下额外创建一个子目录作为项目根目录")
     parser.add_argument(

@@ -1217,7 +1217,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser("init", help="初始化小说项目")
     init_parser.add_argument("project_name", nargs="?", help="项目目录名；默认原地初始化时可不传，使用 --subdir 时作为子目录名")
     init_parser.add_argument("--book-title", help="书名；默认取 project_name，原地初始化且未传时取当前目录名")
-    init_parser.add_argument("--target-dir", help="项目创建目录，默认当前目录")
+    init_parser.add_argument("--target-dir", required=True, help="目标项目目录；必须显式传入")
     init_parser.add_argument("--in-place", action="store_true", default=True, help="直接在目标目录/当前目录初始化（默认行为）")
     init_parser.add_argument("--subdir", action="store_true", help="在目标目录下额外创建一个子目录作为项目根目录")
     init_parser.add_argument("--mode", choices=("single", "dual", "ensemble"), default="single")

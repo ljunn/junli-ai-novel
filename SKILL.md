@@ -101,6 +101,8 @@ python3 scripts/chapter_pipeline.py init --target-dir "<项目目录>" --book-ti
 python3 scripts/chapter_pipeline.py init "项目目录名" --target-dir "<上级目录>" --subdir --book-title "书名"
 ```
 
+`init` 必须显式传 `--target-dir`，不要依赖当前目录。
+
 参考：
 - `references/main-plot-construction.md`
 - `references/outline-template.md`
