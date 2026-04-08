@@ -13,6 +13,14 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 REFERENCES_DIR = ROOT_DIR / "references"
 
 
+def is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def load_template(filename: str, fallback: str) -> str:
     path = REFERENCES_DIR / filename
     if path.exists():
@@ -507,6 +515,11 @@ def create_novel_project(
     book_title: str | None = None,
 ) -> Path:
     base_dir = Path(target_dir).expanduser().resolve() if target_dir else Path.cwd()
+    if target_dir is None and is_within(base_dir, ROOT_DIR):
+        raise ValueError(
+            "当前目录位于 skill 安装目录内。为避免误写入，请显式传 --target-dir 指向你的小说项目目录，"
+            "或先切换到目标项目目录再执行 init。"
+        )
     if in_place:
         project_dir = base_dir
         resolved_book_title = book_title or project_name or project_dir.name

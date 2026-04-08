@@ -97,8 +97,8 @@ python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume "
 - 最后初始化项目：
 
 ```bash
-python3 scripts/chapter_pipeline.py init --book-title "书名"
-python3 scripts/chapter_pipeline.py init "项目目录名" --subdir --book-title "书名"
+python3 scripts/chapter_pipeline.py init --target-dir "<项目目录>" --book-title "书名"
+python3 scripts/chapter_pipeline.py init "项目目录名" --target-dir "<上级目录>" --subdir --book-title "书名"
 ```
 
 参考：
