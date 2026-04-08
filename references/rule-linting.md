@@ -15,6 +15,14 @@
 - AI 套语
 - 结尾升华 / 结尾总结
 - 视角越权提示
+- 对白说明感
+- 正文解释腔
+- 转场连接词过密
+
+相关命令：
+
+- `python3 scripts/chapter_pipeline.py lint <章节文件路径>`
+- `python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>`
 
 规则文件放在：
 

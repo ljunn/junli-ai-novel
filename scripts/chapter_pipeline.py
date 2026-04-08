@@ -285,6 +285,7 @@ def runtime_paths(project_dir: Path, chapter_num: int) -> dict[str, Path]:
         "runtime_dir": runtime_dir,
         "intent": runtime_dir / f"{prefix}.intent.md",
         "context": runtime_dir / f"{prefix}.context.json",
+        "scenes": runtime_dir / f"{prefix}.scenes.md",
         "rule_stack": runtime_dir / f"{prefix}.rule-stack.yaml",
         "trace": runtime_dir / f"{prefix}.trace.json",
     }
@@ -329,6 +330,11 @@ def load_lint_rules(project_dir: Path, rule_set: str = "novel-lint") -> list[dic
 
 
 def scoped_text_for_rule(text: str, scope: str) -> str:
+    if scope == "dialogue":
+        dialogue_chunks: list[str] = []
+        for pattern in (r"“([^”]{1,200})”", r"\"([^\"]{1,200})\""):
+            dialogue_chunks.extend(re.findall(pattern, text))
+        return "\n".join(chunk.strip() for chunk in dialogue_chunks if chunk.strip())
     if scope == "ending":
         stripped = text.strip()
         if not stripped:
@@ -539,6 +545,78 @@ def render_rule_stack_yaml(summary: dict, chapter_num: int, chapter_title: str |
     return "\n".join(lines)
 
 
+def build_scene_cards(summary: dict, chapter_num: int, chapter_title: str | None, guidance: str) -> str:
+    pov = first_meaningful_value(summary.get("viewpoint")) or "主 POV"
+    location = first_meaningful_value(summary.get("protagonist_location")) or "当前主要场域"
+    goal = first_meaningful_value(guidance, summary.get("phase_goal"), summary.get("next_goal")) or "推进当前主线"
+    state = first_meaningful_value(summary.get("protagonist_state")) or "带着未结问题入场"
+    hook_pressure = summary.get("active_plots", [])[:2]
+    hook_note = "；".join(str(item) for item in hook_pressure) if hook_pressure else "暂无高优先级伏笔压力"
+
+    scenes = [
+        {
+            "title": "场景一：承接与入场",
+            "function": "承接上章钩子，迅速把主角推回当前前台问题",
+            "want": goal,
+            "block": "立刻出现的规则压力、资源压力或关系阻力",
+            "relation": "至少让一组人物关系出现轻微错位、试探或拉扯",
+            "info": "补足本章必须知道但此前未说透的信息",
+            "handoff": "把局势推进到必须正面对抗或做选择",
+        },
+        {
+            "title": "场景二：正面对抗",
+            "function": "让人物围绕目标发生真正对抗，而不是信息复述",
+            "want": "拿到、守住、证明、隐瞒或逃离某件事",
+            "block": "来自人物、规则或现实条件的直接阻拦",
+            "relation": "关系发生可感知变化，不能只是态度重复",
+            "info": f"给出本章最重要的信息增量，并注意伏笔压力：{hook_note}",
+            "handoff": "形成新的失衡、误判或代价",
+        },
+        {
+            "title": "场景三：结算与钩子",
+            "function": "给阶段性回报，同时把读者送进下一章问题",
+            "want": "让本章至少兑现一项回报：爽点、情绪点、关系点或信息收益",
+            "block": "不能把主线、支线和阶段问题同时清零",
+            "relation": "让本章关系变化固定下来，留下下一步张力",
+            "info": "明确本章结尾的新问题、新危险或新选择",
+            "handoff": "结尾停在动作、发现、选择或危险上",
+        },
+    ]
+
+    lines = [
+        "# Scene Cards",
+        "",
+        "## Chapter",
+        f"第{chapter_num}章" + (f"：{chapter_title}" if chapter_title else ""),
+        "",
+        "## Runtime Summary",
+        f"- 当前卷：{summary.get('current_volume', '未记录')}",
+        f"- 当前阶段：{summary.get('current_phase', '未记录')}",
+        f"- 当前阶段目标：{summary.get('phase_goal', '未记录')}",
+        f"- 主 POV：{pov}",
+        f"- 主角位置：{location}",
+        f"- 主角状态：{state}",
+        f"- 本章总目标：{goal}",
+        "",
+    ]
+
+    for scene in scenes:
+        lines.extend([
+            scene["title"],
+            f"- 地点：{location}",
+            f"- POV：{pov}",
+            f"- 场景功能：{scene['function']}",
+            f"- 谁想要什么：{scene['want']}",
+            f"- 谁阻止谁：{scene['block']}",
+            f"- 关系怎么变：{scene['relation']}",
+            f"- 信息增量：{scene['info']}",
+            f"- 推向下一场：{scene['handoff']}",
+            "",
+        ])
+
+    return "\n".join(lines)
+
+
 def materialize_plan(project_dir: Path, summary: dict, chapter_num: int, chapter_title: str | None, guidance: str) -> dict:
     paths = runtime_paths(project_dir, chapter_num)
     paths["runtime_dir"].mkdir(parents=True, exist_ok=True)
@@ -589,6 +667,7 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
     }
 
     paths["context"].write_text(json.dumps(context_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    paths["scenes"].write_text(build_scene_cards(summary, chapter_num, chapter_title, guidance), encoding="utf-8")
     paths["trace"].write_text(json.dumps(trace_payload, ensure_ascii=False, indent=2), encoding="utf-8")
     paths["rule_stack"].write_text(render_rule_stack_yaml(summary, chapter_num, chapter_title), encoding="utf-8")
 
@@ -596,6 +675,7 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
         "chapter": chapter_num,
         "intent_path": str(paths["intent"]),
         "context_path": str(paths["context"]),
+        "scenes_path": str(paths["scenes"]),
         "rule_stack_path": str(paths["rule_stack"]),
         "trace_path": str(paths["trace"]),
         "goal": plan_result["goal"],
@@ -773,6 +853,65 @@ def handle_lint(args: argparse.Namespace) -> int:
     return 0
 
 
+def extract_dialogue_stats(text: str) -> dict[str, Any]:
+    dialogue_chunks: list[str] = []
+    for pattern in (r"“([^”]{1,400})”", r"\"([^\"]{1,400})\""):
+        dialogue_chunks.extend(re.findall(pattern, text))
+    total_lines = len(dialogue_chunks)
+    total_chars = sum(len(chunk) for chunk in dialogue_chunks)
+    avg_chars = round(total_chars / total_lines, 1) if total_lines else 0
+    long_lines = [chunk for chunk in dialogue_chunks if len(chunk) >= 30]
+    return {
+        "dialogue_lines": total_lines,
+        "dialogue_chars": total_chars,
+        "avg_chars_per_line": avg_chars,
+        "long_lines": long_lines[:5],
+    }
+
+
+def handle_dialogue_pass(args: argparse.Namespace) -> int:
+    chapter_path = Path(args.chapter_path).expanduser().resolve()
+    if not chapter_path.exists():
+        print(json.dumps({"error": f"文件不存在: {chapter_path}"}, ensure_ascii=False, indent=2))
+        return 2
+
+    content = chapter_path.read_text(encoding="utf-8")
+    stats = extract_dialogue_stats(content)
+    rules = [
+        rule
+        for rule in load_lint_rules(Path.cwd(), rule_set=args.rule_set)
+        if str(rule.get("scope", "")) == "dialogue"
+    ]
+    findings = lint_chapter_text(content, rules)
+    result = {
+        "file": str(chapter_path),
+        "stats": stats,
+        "findings": findings,
+    }
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    print("\n" + "=" * 60)
+    print(f"对白专审: {chapter_path.name}")
+    print("=" * 60)
+    print(f"- 对白行数: {stats['dialogue_lines']}")
+    print(f"- 对白总字数: {stats['dialogue_chars']}")
+    print(f"- 平均每句长度: {stats['avg_chars_per_line']}")
+    if stats["long_lines"]:
+        print("- 过长对白示例:")
+        for item in stats["long_lines"]:
+            print(f"  - {excerpt_text(item, max_chars=60)}")
+    if findings:
+        print("- 规则命中:")
+        for item in findings:
+            print(f"  - {item['name']} [{item['severity']}] {item['message']}")
+    else:
+        print("- 规则命中: 无")
+    return 0
+
+
 def add_progress_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("project_path", help="项目根目录")
     parser.add_argument("chapter_num", type=int, help="章节号")
@@ -848,6 +987,7 @@ def handle_compose(args: argparse.Namespace) -> int:
         print(f"章节: 第{chapter_num}章")
         print(f"意图文件: {result['intent_path']}")
         print(f"上下文文件: {result['context_path']}")
+        print(f"场景卡文件: {result['scenes_path']}")
         print(f"规则栈文件: {result['rule_stack_path']}")
         print(f"轨迹文件: {result['trace_path']}")
     return 0
@@ -1136,6 +1276,12 @@ def build_parser() -> argparse.ArgumentParser:
     lint_parser.add_argument("--rule-set", default="novel-lint", help="规则集目录名，默认 novel-lint")
     lint_parser.add_argument("--json", action="store_true", help="输出 JSON")
     lint_parser.set_defaults(handler=handle_lint)
+
+    dialogue_parser = subparsers.add_parser("dialogue-pass", help="对白专审")
+    dialogue_parser.add_argument("chapter_path", help="章节文件路径")
+    dialogue_parser.add_argument("--rule-set", default="novel-lint", help="规则集目录名，默认 novel-lint")
+    dialogue_parser.add_argument("--json", action="store_true", help="输出 JSON")
+    dialogue_parser.set_defaults(handler=handle_dialogue_pass)
 
     finish_parser = subparsers.add_parser("finish", help="检查并同步章节完成状态")
     add_progress_arguments(finish_parser)

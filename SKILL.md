@@ -191,6 +191,7 @@ python3 scripts/chapter_pipeline.py init "项目名" --mode single
 ├── runtime/
 │   ├── chapter-0001.intent.md
 │   ├── chapter-0001.context.json
+│   ├── chapter-0001.scenes.md
 │   ├── chapter-0001.rule-stack.yaml
 │   └── chapter-0001.trace.json
 └── task_log.md
@@ -234,6 +235,7 @@ python3 scripts/chapter_pipeline.py plan <项目目录> --chapter-num ... --chap
 python3 scripts/chapter_pipeline.py compose <项目目录> --chapter-num ... --chapter-title ...
 python3 scripts/chapter_pipeline.py start <项目目录> <章节号> ...
 python3 scripts/chapter_pipeline.py check <章节文件路径>
+python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>
 python3 scripts/chapter_pipeline.py lint <章节文件路径>
 python3 scripts/chapter_pipeline.py finish <项目目录> <章节号> <章节文件路径> --summary "摘要"
 python3 scripts/chapter_pipeline.py audit <项目目录> --scope stage

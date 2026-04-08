@@ -5,7 +5,7 @@
 默认服务平台向长篇网文连载，目标优先级是：追读牵引 > 卖点兑现 > 连载稳定 > 文本局部花活。
 
 如果项目目标进入超长篇范围，这份文件只负责“章内执行”，不负责卷级与阶段级治理。卷级与阶段级治理另看 `references/longform-governance.md`。
-如果项目已启用输入治理，开写前先生成并阅读 `runtime/chapter-XXXX.intent.md`、`context.json`、`rule-stack.yaml`，再进入场景拆分。
+如果项目已启用输入治理，开写前先生成并阅读 `runtime/chapter-XXXX.intent.md`、`context.json`、`scenes.md`、`rule-stack.yaml`，再进入场景拆分。
 
 ## 1. 写前分析
 
@@ -19,7 +19,7 @@
 6. 读取 `docs/大纲.md`
 7. 读取上一章正文
 8. 读取相关角色与设定
-9. 读取 `runtime/chapter-XXXX.intent.md`、`context.json`、`rule-stack.yaml`
+9. 读取 `runtime/chapter-XXXX.intent.md`、`context.json`、`scenes.md`、`rule-stack.yaml`
 10. 检查活跃伏笔和时间线
 11. 将目标章节在 `docs/大纲.md` 中标记为“进行中”，并执行 `start`
 
@@ -158,6 +158,7 @@
 - 文学感较强的网文开篇：`references/literary-opening.md`
 - 定向返修微操作：`references/micro-revision-ops.md`
 - 规则化文本检查：`references/rule-linting.md`
+- 对白专审：`python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>`
 - 对话：`references/dialogue-writing.md`
 - 扩写：`references/content-expansion.md`
 - 日常叙事：`references/daily-narrative.md`
