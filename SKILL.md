@@ -98,6 +98,7 @@ python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume "
 
 ```bash
 python3 scripts/chapter_pipeline.py init "项目名" --mode single
+python3 scripts/chapter_pipeline.py init --in-place --book-title "书名"
 ```
 
 参考：

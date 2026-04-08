@@ -935,11 +935,13 @@ def add_progress_arguments(parser: argparse.ArgumentParser) -> None:
 def handle_init(args: argparse.Namespace) -> int:
     create_novel_project(
         args.project_name,
+        book_title=args.book_title,
         target_dir=args.target_dir,
         force=args.force,
         mode=args.mode,
         complex_relationships=args.complex_relationships,
         romance_focus=args.romance_focus,
+        in_place=args.in_place,
     )
     return 0
 
@@ -1213,8 +1215,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="初始化小说项目")
-    init_parser.add_argument("project_name", help="项目名称")
+    init_parser.add_argument("project_name", nargs="?", help="项目目录名；使用 --in-place 时可不传")
+    init_parser.add_argument("--book-title", help="书名；默认与项目目录名相同，或原地初始化时取当前目录名")
     init_parser.add_argument("--target-dir", help="项目创建目录，默认当前目录")
+    init_parser.add_argument("--in-place", action="store_true", help="直接在目标目录/当前目录初始化，不额外创建子目录")
     init_parser.add_argument("--mode", choices=("single", "dual", "ensemble"), default="single")
     init_parser.add_argument("--complex-relationships", action="store_true", help="创建关系图模板")
     init_parser.add_argument("--romance-focus", action="store_true", help="感情线重要时创建关系图模板")

@@ -497,21 +497,29 @@ def write_file(path: Path, content: str, force: bool) -> None:
 
 
 def create_novel_project(
-    project_name: str,
+    project_name: str | None = None,
     target_dir: str | None = None,
     force: bool = False,
     mode: str = "single",
     complex_relationships: bool = False,
     romance_focus: bool = False,
+    in_place: bool = False,
+    book_title: str | None = None,
 ) -> Path:
     base_dir = Path(target_dir).expanduser().resolve() if target_dir else Path.cwd()
-    project_dir = base_dir / project_name
+    if in_place:
+        project_dir = base_dir
+        resolved_book_title = book_title or project_name or project_dir.name
+    else:
+        resolved_dir_name = project_name or "my-novel"
+        project_dir = base_dir / resolved_dir_name
+        resolved_book_title = book_title or resolved_dir_name
 
     for folder in ("docs", "characters", "manuscript", "plot", "runtime"):
         (project_dir / folder).mkdir(parents=True, exist_ok=True)
 
     outline = load_template("outline-template.md", "# 大纲\n")
-    outline = outline.replace("[小说名称]", project_name)
+    outline = outline.replace("[小说名称]", resolved_book_title)
     character = load_template("character-template.md", "# 人物档案\n")
 
     files = {
@@ -524,7 +532,7 @@ def create_novel_project(
         project_dir / "characters" / "人物档案.md": character,
         project_dir / "plot" / "伏笔记录.md": build_foreshadow_template(),
         project_dir / "plot" / "时间线.md": build_timeline_template(),
-        project_dir / "task_log.md": build_task_log(project_name),
+        project_dir / "task_log.md": build_task_log(resolved_book_title),
     }
 
     if mode in {"dual", "ensemble"}:
@@ -545,8 +553,10 @@ def create_novel_project(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="创建长篇小说项目结构")
-    parser.add_argument("project_name", nargs="?", default="my-novel", help="项目目录名")
+    parser.add_argument("project_name", nargs="?", help="项目目录名；使用 --in-place 时可不传")
+    parser.add_argument("--book-title", help="书名；默认与项目目录名相同，或原地初始化时取当前目录名")
     parser.add_argument("--target-dir", help="项目创建到哪个目录下，默认当前目录")
+    parser.add_argument("--in-place", action="store_true", help="直接在目标目录/当前目录初始化，不再额外创建子目录")
     parser.add_argument(
         "--mode",
         choices=("single", "dual", "ensemble"),
@@ -563,9 +573,11 @@ if __name__ == "__main__":
     args = parse_args()
     create_novel_project(
         args.project_name,
+        book_title=args.book_title,
         target_dir=args.target_dir,
         force=args.force,
         mode=args.mode,
         complex_relationships=args.complex_relationships,
         romance_focus=args.romance_focus,
+        in_place=args.in_place,
     )
