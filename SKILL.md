@@ -234,6 +234,7 @@ python3 scripts/chapter_pipeline.py plan <项目目录> --chapter-num ... --chap
 python3 scripts/chapter_pipeline.py compose <项目目录> --chapter-num ... --chapter-title ...
 python3 scripts/chapter_pipeline.py start <项目目录> <章节号> ...
 python3 scripts/chapter_pipeline.py check <章节文件路径>
+python3 scripts/chapter_pipeline.py lint <章节文件路径>
 python3 scripts/chapter_pipeline.py finish <项目目录> <章节号> <章节文件路径> --summary "摘要"
 python3 scripts/chapter_pipeline.py audit <项目目录> --scope stage
 python3 scripts/chapter_pipeline.py audit <项目目录> --scope volume
@@ -268,6 +269,7 @@ python3 scripts/chapter_pipeline.py audit <项目目录> --scope volume
 - `references/quality-checklist.md`
 - `references/consistency.md`
 - `references/style-guardrails.md`
+- `references/rule-linting.md`
 
 工具吸收 / 方法沉淀：
 - `references/tooling-adoption-roadmap.md`

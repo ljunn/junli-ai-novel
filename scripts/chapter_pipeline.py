@@ -10,6 +10,9 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 try:
     from chapter_text import is_chapter_file
@@ -299,6 +302,65 @@ def excerpt_text(text: str, keyword: str | None = None, max_chars: int = 600) ->
     if len(cleaned) > max_chars:
         cleaned = cleaned[:max_chars].rstrip() + "..."
     return cleaned
+
+
+def count_keyword_hits(text: str, keywords: list[str]) -> list[dict[str, Any]]:
+    hits: list[dict[str, Any]] = []
+    for keyword in keywords:
+        count = text.count(keyword)
+        if count > 0:
+            hits.append({"keyword": keyword, "count": count})
+    return hits
+
+
+def load_lint_rules(project_dir: Path, rule_set: str = "novel-lint") -> list[dict[str, Any]]:
+    rule_dir = project_dir / "rules" / rule_set
+    if not rule_dir.exists():
+        return []
+
+    rules: list[dict[str, Any]] = []
+    for path in sorted(rule_dir.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if not isinstance(data, dict):
+            continue
+        data["path"] = str(path)
+        rules.append(data)
+    return rules
+
+
+def scoped_text_for_rule(text: str, scope: str) -> str:
+    if scope == "ending":
+        stripped = text.strip()
+        if not stripped:
+            return stripped
+        segment = max(400, len(stripped) // 5)
+        return stripped[-segment:]
+    return text
+
+
+def lint_chapter_text(text: str, rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for rule in rules:
+        if rule.get("type") != "keywords":
+            continue
+        scope = str(rule.get("scope", "full"))
+        threshold = int(rule.get("threshold", 1))
+        scoped = scoped_text_for_rule(text, scope)
+        hits = count_keyword_hits(scoped, list(rule.get("keywords", [])))
+        total = sum(item["count"] for item in hits)
+        if total < threshold:
+            continue
+        findings.append({
+            "id": rule.get("id"),
+            "name": rule.get("name"),
+            "severity": rule.get("severity", "warning"),
+            "scope": scope,
+            "message": rule.get("message", ""),
+            "total_hits": total,
+            "hits": hits,
+            "rule_path": rule.get("path"),
+        })
+    return findings
 
 
 def load_context_source(path: Path, reason: str, keyword: str | None = None, max_chars: int = 600) -> dict | None:
@@ -632,10 +694,13 @@ def handle_preflight(args: argparse.Namespace) -> int:
 
 
 def build_check_report(chapter_path: Path) -> dict:
+    rules = load_lint_rules(Path.cwd())
+    chapter_text = chapter_path.read_text(encoding="utf-8") if chapter_path.exists() else ""
     return {
         "wordcount": check_chapter(str(chapter_path)),
         "emotion": analyze_chapter_emotion_curve(str(chapter_path)),
         "thrills": analyze_thrills_and_poisons(str(chapter_path)),
+        "lint": lint_chapter_text(chapter_text, rules) if chapter_text else [],
     }
 
 
@@ -643,6 +708,7 @@ def print_check_summary(report: dict) -> None:
     wordcount = report["wordcount"]
     emotion = report["emotion"]
     thrills = report["thrills"]
+    lint_findings = report.get("lint", [])
 
     print("\n" + "=" * 60)
     print(f"章节检查摘要: {Path(wordcount['file']).name}")
@@ -658,6 +724,7 @@ def print_check_summary(report: dict) -> None:
         f"- 爽点/毒点: thrill={thrills.get('thrill_score', 0)}, "
         f"poison={thrills.get('poison_score', 0)}, overall={thrills.get('overall', 'unknown')}"
     )
+    print(f"- 规则检查: {len(lint_findings)} 条命中")
 
     issues: list[str] = []
     if wordcount["status"] != "pass":
@@ -671,6 +738,39 @@ def print_check_summary(report: dict) -> None:
         print("- 警告:")
         for item in issues:
             print(f"  - {item}")
+    if lint_findings:
+        print("- 规则命中:")
+        for item in lint_findings[:5]:
+            print(f"  - {item['name']} ({item['severity']}): {item['message']}")
+
+
+def handle_lint(args: argparse.Namespace) -> int:
+    chapter_path = Path(args.chapter_path).expanduser().resolve()
+    if not chapter_path.exists():
+        print(json.dumps({"error": f"文件不存在: {chapter_path}"}, ensure_ascii=False, indent=2))
+        return 2
+
+    rules = load_lint_rules(Path.cwd(), rule_set=args.rule_set)
+    content = chapter_path.read_text(encoding="utf-8")
+    findings = lint_chapter_text(content, rules)
+
+    if args.json:
+        print(json.dumps({"file": str(chapter_path), "findings": findings}, ensure_ascii=False, indent=2))
+        return 0
+
+    print("\n" + "=" * 60)
+    print(f"规则检查: {chapter_path.name}")
+    print("=" * 60)
+    if not findings:
+        print("- 未命中规则")
+        return 0
+
+    for item in findings:
+        print(f"- {item['name']} [{item['severity']}]")
+        print(f"  {item['message']}")
+        for hit in item["hits"][:5]:
+            print(f"  - {hit['keyword']} x{hit['count']}")
+    return 0
 
 
 def add_progress_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1030,6 +1130,12 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser = subparsers.add_parser("check", help="汇总检查单章")
     check_parser.add_argument("chapter_path", help="章节文件路径")
     check_parser.set_defaults(handler=handle_check)
+
+    lint_parser = subparsers.add_parser("lint", help="按规则检查单章")
+    lint_parser.add_argument("chapter_path", help="章节文件路径")
+    lint_parser.add_argument("--rule-set", default="novel-lint", help="规则集目录名，默认 novel-lint")
+    lint_parser.add_argument("--json", action="store_true", help="输出 JSON")
+    lint_parser.set_defaults(handler=handle_lint)
 
     finish_parser = subparsers.add_parser("finish", help="检查并同步章节完成状态")
     add_progress_arguments(finish_parser)

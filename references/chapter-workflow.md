@@ -157,6 +157,7 @@
 - 开头与章节结构：`references/chapter-guide.md`
 - 文学感较强的网文开篇：`references/literary-opening.md`
 - 定向返修微操作：`references/micro-revision-ops.md`
+- 规则化文本检查：`references/rule-linting.md`
 - 对话：`references/dialogue-writing.md`
 - 扩写：`references/content-expansion.md`
 - 日常叙事：`references/daily-narrative.md`
