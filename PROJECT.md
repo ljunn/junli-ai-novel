@@ -1,52 +1,43 @@
-# 君黎 AI 网文连载项目宪法索引
+# 君黎 AI 网文连载项目入口
 
-这是本仓库的总入口。先看这里，再去看分散文档。
+收到任务后，先对号入座选 Workflow，再跑命令，不用先背架构。
 
-本项目现在按 3 层暴露能力：
+## 任务 → Workflow 对照
 
-1. Rule：定义什么不能错、什么优先级最高。
-2. Workflow：把高频任务包成可直接执行的工作流。
-3. Command：保留底层原子命令，给需要拆解调试的人用。
+| 任务 | 用这个 |
+|------|--------|
+| 继续写下一章 | `next-chapter` |
+| 章节质检 / 审稿 | `review` |
+| 超长篇 / 分卷 / 阶段治理 | `bootstrap-longform` + `governance` + `audit` |
+| 商业化包装 / 平台上架文案 | `marketing` |
 
-默认顺序不是“先记命令”，而是：
+拿不准入口：`python3 scripts/chapter_pipeline.py workflows`
 
-1. 先判定自己现在处于哪个 Workflow。
-2. 再确认会受哪些 Rule 约束。
-3. 只有需要拆开排查时，才回到底层 Command。
+## 项目规则文件用途
 
-## Rule
+读这些文件是为了弄清楚"当前状态"和"不能踩的红线"，不是为了背设定。
 
-- 宪法层：`docs/全书宪法.md`、`docs/世界观.md`、`docs/法则.md`、`characters/*.md`
-- 结构治理层：`docs/项目总纲.md`、`docs/卷纲.md`、`docs/阶段规划.md`、`docs/变更日志.md`
-- 项目运行层：`task_log.md`、`docs/章节规划.md`、`plot/伏笔记录.md`、`plot/时间线.md`
-- 规则巡检层：`rules/novel-lint/*.yaml`、`references/rule-linting.md`
-- 连贯性与质检层：`references/consistency.md`、`references/quality-checklist.md`
+- **什么不能改**：`docs/全书宪法.md`、`docs/世界观.md`、`docs/法则.md`、`characters/*.md`
+- **当前写到哪了**：`task_log.md`、`docs/章节规划.md`、`plot/伏笔记录.md`、`plot/时间线.md`
+- **全书结构怎么分**：`docs/项目总纲.md`、`docs/卷纲.md`、`docs/阶段规划.md`、`docs/变更日志.md`
+- **本章写作约束**：`rules/novel-lint/*.yaml`、`references/rule-linting.md`
+- **一致性和质检**：`references/consistency.md`、`references/quality-checklist.md`
 
-优先级固定：`宪法层 > 结构治理层 > 项目运行层 > 当前章节临时意图`
+优先级：全书宪法 > 结构文件 > 运行记忆 > 本章临时意图
 
-兼容说明：旧项目如果仍使用 `docs/大纲.md`，默认把它同时视作 `docs/项目总纲.md + docs/章节规划.md` 的兼容入口。
+旧项目如果只有 `docs/大纲.md`，把它同时视作 `项目总纲 + 章节规划`。
 
-查看 Rule 层索引：
+## Workflow 详情
 
-```bash
-python3 scripts/chapter_pipeline.py rules
-```
-
-## Workflow
-
-### 1. 续写下一章
-
-默认入口：
+### 续写下一章
 
 ```bash
 python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title "标题"
 ```
 
-这个入口会串起：
+串联：`preflight → resume → plan → compose → start`
 
-`preflight -> resume -> plan -> compose -> start`
-
-正文写完后，还是用同一条命令闭环，不再回忆命令链：
+正文写完后，同一条命令闭环：
 
 ```bash
 python3 scripts/chapter_pipeline.py next-chapter <项目目录> \
@@ -55,28 +46,15 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> \
   --summary "本章摘要"
 ```
 
-### 2. 单章预审与审稿稿本
-
-默认入口：
+### 章节预审与审稿稿本
 
 ```bash
 python3 scripts/chapter_pipeline.py review <章节文件路径> --project-path <项目目录>
 ```
 
-它会合并：
+输出两层：静态预审（规则/字数/情绪/对白硬信号）+ 审稿稿本（带证据摘录的语义审稿提纲）。
 
-`check + lint + dialogue-pass + consistency`
-
-但现在它不再假装“已经完成语义审稿”。
-
-它会输出两层结果：
-
-- 静态预审：规则、对白、字数、情绪、连贯性硬信号
-- 审稿稿本：带证据摘录和必答问题的语义审稿提纲
-
-### 3. 长篇治理
-
-用于超长篇、分卷、阶段切换、治理补档：
+### 长篇治理
 
 ```bash
 python3 scripts/chapter_pipeline.py bootstrap-longform <项目目录>
@@ -84,61 +62,18 @@ python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume "
 python3 scripts/chapter_pipeline.py audit <项目目录> --scope stage
 ```
 
-### 4. 商业化包装
-
-默认入口：
+### 商业化包装
 
 ```bash
 python3 scripts/chapter_pipeline.py marketing <项目目录> --platform 起点中文网 --audience 男频读者
 ```
 
-这个入口会把作者意图、当前焦点、项目总纲、章节规划、最近剧情、活跃伏笔，连同补充提示词、AI 味词汇、参考材料，一起编译成可复用的营销 Brief / Prompt Pack。
-
-相关方法说明：`references/marketing.md`
-
-查看 Workflow 层索引：
-
-```bash
-python3 scripts/chapter_pipeline.py workflows
-```
-
-## Command
-
-底层原子命令还都保留，适合排查、拆解、精细控制：
-
-- `init`
-- `preflight`
-- `resume`
-- `plan`
-- `compose`
-- `start`
-- `check`
-- `lint`
-- `dialogue-pass`
-- `consistency`
-- `finish`
-- `bootstrap-longform`
-- `governance`
-- `audit`
-
-查看 Command 层索引：
-
-```bash
-python3 scripts/chapter_pipeline.py commands
-```
-
-## 推荐用法
-
-- 不知道从哪里进：先看 `python3 scripts/chapter_pipeline.py workflows`
-- 要继续写下一章：优先用 `next-chapter`
-- 要做章节质检：优先用 `review`
-- 要补商业化包装：优先用 `marketing`
-- 只有 Workflow 失败或需要精细控制时，才拆回原子命令
+把作者意图、当前焦点、项目总纲、近期剧情、活跃伏笔编译成营销 Brief / Prompt Pack。
 
 ## 文件地图
 
-- `PROJECT.md`：项目总入口
-- `SKILL.md`：对 agent 的操作宪法
-- `references/`：方法论文档
-- `rules/novel-lint/`：规则化巡检资产
+- `PROJECT.md`：本文件，任务分流入口
+- `SKILL.md`：AI 操作宪法（含写法原则）
+- `references/`：写作方法论
+- `rules/novel-lint/`：规则化文本巡检
 - `scripts/chapter_pipeline.py`：统一命令入口
