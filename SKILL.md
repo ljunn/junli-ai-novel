@@ -1,6 +1,6 @@
 ---
 name: junli-ai-novel
-description: 平台向长篇网文连载工程工作流，覆盖立项、续写、单章返修、多层记忆维护、阶段/卷治理与章节质检；适用于主线规划、长篇续写、上下文恢复、项目记忆同步和超长篇控盘。更多信息关注抖音君黎。
+description: 平台向长篇网文连载写作助手。负责新项目立项、章节续写、单章返修、项目记忆维护、长篇分卷治理和章节质检。内置章节/场景/语言三层写法原则，适配爽文、言情、权谋等主流题材，支持从脑洞到超长篇全流程。更多信息关注抖音君黎。
 ---
 
 # 君黎 AI 网文连载
@@ -85,19 +85,16 @@ python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume "
 8. 如果要改全书终局、主角长期弧线、世界底层规则、长线关系边界，必须先更新 `docs/变更日志.md`，再继续正文。
 9. 如果无法执行命令、无法读取关键文件或前置校验失败，必须明确报告阻塞；禁止假装已经恢复上下文、已经检查或已经同步进度。
 
-## 违约信号
+## 常见失误
 
-出现任一情况，视为未遵守本 skill：
+下面这些做了等于白做，必须避免：
 
-- 没跑 `preflight` / `resume` 就直接续写正文
-- 长篇项目没跑 `plan` / `compose` 就直接进入正文
-- 没跑 `start` 就直接写下一章
-- 没跑 `check` / `finish --summary` 就宣称本章完成
-- 记忆文件缺失时仍继续写
-- 已进入长篇治理范围，却没有卷纲 / 阶段规划 / 变更日志
-- 跳过 `audit` 长期平推超过一个阶段
-- 核心设定或终局方向改了，却没同步变更日志
-- 用户只要求局部返修，却整章重写或并发堆多个微操作
+- 没跑 `preflight` / `resume` 就续写正文（上下文没恢复）
+- 记忆文件缺失时假装已恢复，继续写
+- 长篇项目缺卷纲 / 阶段规划 / 变更日志，却平推正文
+- 超过一个阶段没跑 `audit`
+- 核心设定或终局方向改了，却没写进变更日志
+- 用户只要求局部返修，却整章重写
 
 ## 任务分流
 
@@ -240,41 +237,48 @@ python3 scripts/chapter_pipeline.py init "项目名" --mode single
 
 消歧顺序：`L4 > L3 > L2 > L1`
 
-## 正文硬规则
+## 正文写法原则
 
-- 写入 `manuscript/` 时必须是纯正文，不输出章节壳
-- 默认目标 3000-5000 字；用户明确要求时从用户
-- 每章至少推进一条前台线
-- 每章至少回应一个旧悬念
-- 每章至少留下一个新钩子或升级旧钩子
-- 每章至少给出一种可感知回报
-- 主角受挫时，正文内或紧邻章节必须给出补偿基础
-- 默认单一主 POV；群像或多线章没有明确收益时，不在同章乱切视角
+这是写正文时应该主动对标的标准，不是事后检查清单。
 
-## 推荐命令
+### 章节层
+
+- **目标单一**：每章核心事件不超过 2 条，多了就切章，别塞
+- **章尾造压**：用未解决的张力收尾——不是总结，是读者不读下一章会难受
+- **每章必须有一次实感回报**：翻盘、揭秘、关系进展、能力升级任选其一；没有回报，读者掉追读
+- **受挫必须给补偿基础**：主角挫败后，同章或紧邻章节给出反击或希望的锚点，不能连续几章只有憋屈
+
+### 场景层
+
+- **每个场景从状态 A 走到状态 B**，开头和结尾的人物处境或信息量不能一样
+- **高能前放慢**：爆发场景前插 1-2 个低强度段给读者换气，高能后给收尾拍，别急着跳下一幕
+- **对白的作用只有两种**：推进冲突、暴露性格。不用对白解释背景设定，那是说明书
+- **视角纪律**：第三人称紧贴主 POV 的认知边界，不提主角不知道的信息，不在同段乱切脑内
+
+### 语言层
+
+- **规避 AI 高频套语**：以 X 为 Y、在这一刻、心中涌起、岁月/征程、结尾感悟升华、"他知道"+"他明白"连用
+- **心理描写不超标**：思路链路是"想法 → 行动 → 结果"，不用旁白总结角色感受，让读者自己感受
+- **具体优于抽象**：写"刀口从肩膀切下去，皮肤往两侧翻"而不是"他受了重伤"；写"她没说话，拿起外套走了"而不是"她很失望"
+- **情绪不要直接命名**：不写"他感到愤怒"，写愤怒的行为和身体反应
+
+## 常用命令入口
+
+高频场景直接用这四条，其余原子命令查 `python3 scripts/chapter_pipeline.py commands`：
 
 ```bash
-python3 scripts/chapter_pipeline.py rules
-python3 scripts/chapter_pipeline.py workflows
-python3 scripts/chapter_pipeline.py commands
-python3 scripts/chapter_pipeline.py init ...
-python3 scripts/chapter_pipeline.py bootstrap-longform <项目目录>
-python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume ... --current-phase ... --phase-goal ...
-python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title ...
-python3 scripts/chapter_pipeline.py preflight <项目目录>
-python3 scripts/chapter_pipeline.py resume <项目目录>
-python3 scripts/chapter_pipeline.py plan <项目目录> --chapter-num ... --chapter-title ...
-python3 scripts/chapter_pipeline.py compose <项目目录> --chapter-num ... --chapter-title ...
-python3 scripts/chapter_pipeline.py start <项目目录> <章节号> ...
-python3 scripts/chapter_pipeline.py check <章节文件路径>
+# 续写下一章（自动串联 preflight→resume→plan→compose→start）
+python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title "标题"
+
+# 章节质检（静态预审 + 审稿稿本）
 python3 scripts/chapter_pipeline.py review <章节文件路径> --project-path <项目目录>
-python3 scripts/chapter_pipeline.py consistency <章节文件路径> --project-path <项目目录>
-python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>
-python3 scripts/chapter_pipeline.py lint <章节文件路径>
-python3 scripts/chapter_pipeline.py finish <项目目录> <章节号> <章节文件路径> --summary "摘要"
-python3 scripts/chapter_pipeline.py audit <项目目录> --scope stage
-python3 scripts/chapter_pipeline.py audit <项目目录> --scope volume
-python3 scripts/chapter_pipeline.py marketing <项目目录> --platform ... --audience ...
+
+# 长篇治理初始化 / 状态同步
+python3 scripts/chapter_pipeline.py bootstrap-longform <项目目录>
+python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume "第一卷" --current-phase "阶段1" --phase-goal "目标"
+
+# 商业化包装
+python3 scripts/chapter_pipeline.py marketing <项目目录> --platform 起点中文网 --audience 男频读者
 ```
 
 ## 参考资料地图
