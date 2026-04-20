@@ -7,6 +7,7 @@
 - 这不是替代人工审稿的万能器
 - 它只负责抓高频、低语义歧义、适合规则化的问题
 - 它优先服务长篇项目的稳定性，而不是追求文学审美自动评分
+- 它现在支持“关键词 + 正则 + 证据摘录”，但依然只是静态预审，不等于完成语义审稿
 
 ## 当前规则范围
 
@@ -23,6 +24,8 @@
 
 - `python3 scripts/chapter_pipeline.py lint <章节文件路径>`
 - `python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>`
+- `python3 scripts/chapter_pipeline.py consistency <章节文件路径> --project-path <项目目录>`
+- `python3 scripts/chapter_pipeline.py review <章节文件路径> --project-path <项目目录>`
 
 规则文件放在：
 

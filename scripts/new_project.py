@@ -49,8 +49,8 @@ def build_task_log(project_name: str) -> str:
 - 暂无
 
 ## 活跃伏笔
-| 伏笔名称 | 埋设章节 | 当前状态 |
-|----------|----------|----------|
+| 伏笔名称 | 埋设章节 | 当前状态 | 关联章节 |
+|----------|----------|----------|----------|
 
 ## 待处理
 - [ ] 待回收伏笔
@@ -510,12 +510,14 @@ def create_novel_project(
     for folder in ("docs", "characters", "manuscript", "plot", "runtime"):
         (project_dir / folder).mkdir(parents=True, exist_ok=True)
 
-    outline = load_template("outline-template.md", "# 大纲\n")
-    outline = outline.replace("[小说名称]", project_name)
+    project_outline = load_template("outline-template.md", "# 项目总纲\n")
+    project_outline = project_outline.replace("[小说名称]", project_name)
+    chapter_plan = load_template("chapter-plan-template.md", "# 章节规划\n")
     character = load_template("character-template.md", "# 人物档案\n")
 
     files = {
-        project_dir / "docs" / "大纲.md": outline,
+        project_dir / "docs" / "项目总纲.md": project_outline,
+        project_dir / "docs" / "章节规划.md": chapter_plan,
         project_dir / "docs" / "作者意图.md": build_author_intent_template(),
         project_dir / "docs" / "当前焦点.md": build_current_focus_template(),
         project_dir / "docs" / "冲突设计.md": build_conflict_template(),

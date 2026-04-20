@@ -142,7 +142,7 @@
 默认做法：
 
 1. 先用 `references/main-plot-construction.md` 拎直主线
-2. 再用 `references/outline-template.md` 建立项目大纲
+2. 再用 `references/outline-template.md` 建立项目总纲，并用 `references/chapter-plan-template.md` 建立章节规划
 3. 发现大纲空心、发散或扩写卡住时，再用这份文档回查
 4. 真正进入单章执行时，接 `references/chapter-workflow.md`
 

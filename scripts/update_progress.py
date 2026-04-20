@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""更新 task_log.md 和伏笔记录。"""
+"""更新 task_log.md、章节规划和伏笔记录。"""
 
 from __future__ import annotations
 
@@ -17,13 +17,39 @@ except ModuleNotFoundError:
 STATUS_IN_PROGRESS = "in_progress"
 STATUS_DONE = "done"
 
+LEGACY_OUTLINE_PATH = "docs/大纲.md"
+PROJECT_OUTLINE_PATH = "docs/项目总纲.md"
+CHAPTER_PLAN_PATH = "docs/章节规划.md"
+
+
+def resolve_project_outline_path(project_dir: Path) -> Path | None:
+    primary = project_dir / PROJECT_OUTLINE_PATH
+    legacy = project_dir / LEGACY_OUTLINE_PATH
+    if primary.exists():
+        return primary
+    if legacy.exists():
+        return legacy
+    return None
+
+
+def resolve_chapter_plan_path(project_dir: Path) -> Path | None:
+    primary = project_dir / CHAPTER_PLAN_PATH
+    legacy = project_dir / LEGACY_OUTLINE_PATH
+    if primary.exists():
+        return primary
+    if legacy.exists():
+        return legacy
+    return None
+
 
 def extract_body(content: str) -> str:
     return extract_body_section(content)
 
 
-def count_chinese_chars(text: str) -> int:
-    return len(re.findall(r"[\u4e00-\u9fff]", text))
+def count_story_units(text: str) -> int:
+    chinese_chars = re.findall(r"[\u4e00-\u9fff]", text)
+    latin_words = re.findall(r"[A-Za-z0-9_]+", text)
+    return len(chinese_chars) + len(latin_words)
 
 
 def compute_manuscript_stats(project_path: Path) -> tuple[int, int]:
@@ -35,7 +61,7 @@ def compute_manuscript_stats(project_path: Path) -> tuple[int, int]:
     total_words = 0
     for chapter_path in chapter_files:
         content = chapter_path.read_text(encoding="utf-8")
-        total_words += count_chinese_chars(extract_body(content))
+        total_words += count_story_units(extract_body(content))
     return len(chapter_files), total_words
 
 
@@ -114,14 +140,21 @@ def update_task_log_active_plots(text: str, plot_note: str | None, chapter_label
 
     pattern = r"(?ms)(^## 活跃伏笔\n)(.*?)(?=^## |\Z)"
     match = re.search(pattern, text)
-    new_row = f"| {plot_note} | {chapter_label} | 待回收 |"
+    header_row = "| 伏笔名称 | 埋设章节 | 当前状态 | 关联章节 |"
+    divider_row = "|----------|----------|----------|----------|"
+    new_row = f"| {plot_note} | {chapter_label} | 待回收 | 待定 |"
 
     if match:
         lines = [line for line in match.group(2).splitlines() if line.strip()]
-        lines = [line for line in lines if line != "|----------|----------|----------|"]
-        header_row = "| 伏笔名称 | 埋设章节 | 当前状态 |"
-        divider_row = "|----------|----------|----------|"
-        data_rows = [line for line in lines if line not in {header_row, divider_row}]
+        data_rows: list[str] = []
+        for line in lines:
+            if line.startswith("| 伏笔名称 |") or set(line.replace("|", "").replace("-", "").strip()) == set():
+                continue
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if len(cells) == 3:
+                cells.append("待定")
+            if len(cells) >= 4:
+                data_rows.append("| " + " | ".join(cells[:4]) + " |")
         if new_row not in data_rows:
             data_rows.append(new_row)
         body_lines = [header_row, divider_row] + data_rows
@@ -129,8 +162,8 @@ def update_task_log_active_plots(text: str, plot_note: str | None, chapter_label
 
     return text.rstrip() + (
         "\n\n## 活跃伏笔\n"
-        "| 伏笔名称 | 埋设章节 | 当前状态 |\n"
-        "|----------|----------|----------|\n"
+        f"{header_row}\n"
+        f"{divider_row}\n"
         f"{new_row}\n"
     )
 
@@ -272,7 +305,7 @@ def upsert_outline_summary_section(text: str, chapter_num: int, chapter_title: s
     return text.rstrip() + "\n\n## 章节摘要\n" + section_body
 
 
-def update_outline(
+def update_chapter_plan(
     project_dir: Path,
     chapter_num: int,
     chapter_title: str | None,
@@ -284,11 +317,11 @@ def update_outline(
     total_words: int,
     status: str = STATUS_DONE,
 ) -> None:
-    outline_path = project_dir / "docs" / "大纲.md"
-    if not outline_path.exists():
+    chapter_plan_path = resolve_chapter_plan_path(project_dir)
+    if chapter_plan_path is None:
         return
 
-    text = outline_path.read_text(encoding="utf-8")
+    text = chapter_plan_path.read_text(encoding="utf-8")
     chapter_label = f"第{chapter_num}章"
     text = update_todo_subsection(text, "待创作", chapter_label)
     if status == STATUS_IN_PROGRESS:
@@ -341,7 +374,7 @@ def update_outline(
     if summary and status == STATUS_DONE:
         text = upsert_outline_summary_section(text, chapter_num, chapter_title, summary)
 
-    outline_path.write_text(text, encoding="utf-8")
+    chapter_plan_path.write_text(text, encoding="utf-8")
 
 
 def update_progress(
@@ -416,7 +449,7 @@ def update_progress(
         content = update_recent_summaries(content, latest_chapter, summary)
         content = update_task_log_active_plots(content, plot_note, chapter_label)
     log_path.write_text(content, encoding="utf-8")
-    update_outline(
+    update_chapter_plan(
         project_dir,
         chapter_num,
         chapter_title,
@@ -482,8 +515,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--word-count", type=int, help="当前章节字数，可选")
     parser.add_argument("--chapter-title", help="章节标题")
     parser.add_argument("--summary", help="本章摘要")
-    parser.add_argument("--core-event", help="本章核心事件，用于同步大纲表格")
-    parser.add_argument("--hook", help="本章悬念钩子，用于同步大纲表格")
+    parser.add_argument("--core-event", help="本章核心事件，用于同步章节规划表格")
+    parser.add_argument("--hook", help="本章悬念钩子，用于同步章节规划表格")
     parser.add_argument("--next-goal", help="下一章目标")
     parser.add_argument("--viewpoint", help="当前视角人物")
     parser.add_argument("--protagonist-location", help="主角位置")
