@@ -17,7 +17,7 @@ import yaml
 ROOT_DIR = Path(__file__).resolve().parent.parent
 LONGFORM_TARGET_WORDS = 1_000_000
 LONGFORM_FALLBACK_TOTAL_WORDS = 300_000
-LONGFORM_FALLBACK_CHAPTERS = 60
+LONGFORM_FALLBACK_CHAPTERS = 20
 
 try:
     from chapter_text import is_chapter_file
