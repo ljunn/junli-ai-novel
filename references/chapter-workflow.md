@@ -4,8 +4,18 @@
 
 默认服务平台向长篇网文连载，目标优先级是：追读牵引 > 卖点兑现 > 连载稳定 > 文本局部花活。
 
+现在默认优先走单入口：
+
+```bash
+python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title "标题"
+```
+
+这条命令会串起 `preflight -> resume -> plan -> compose -> start`。正文完成后，继续用同一条命令补上 `--chapter-path` 和 `--summary`，即可自动闭环到 `finish`。
+
+只有当你需要拆解调试某一环时，才回到底层原子命令。
+
 如果项目目标进入超长篇范围，这份文件只负责“章内执行”，不负责卷级与阶段级治理。卷级与阶段级治理另看 `references/longform-governance.md`。
-如果项目已启用输入治理，开写前先生成并阅读 `runtime/chapter-XXXX.intent.md`、`context.json`、`rule-stack.yaml`，再进入场景拆分。
+如果项目已启用输入治理，开写前先生成并阅读 `runtime/chapter-XXXX.intent.md`、`context.json`、`scenes.md`、`rule-stack.yaml`，再进入场景拆分。
 
 ## 1. 写前分析
 
@@ -16,12 +26,13 @@
 3. 对长篇项目，先运行 `python3 scripts/chapter_pipeline.py plan <项目目录> --chapter-num <章节号>` 生成本章意图
 4. 再运行 `python3 scripts/chapter_pipeline.py compose <项目目录> --chapter-num <章节号>` 生成本章运行时上下文
 5. 读取 `task_log.md`
-6. 读取 `docs/大纲.md`
-7. 读取上一章正文
-8. 读取相关角色与设定
-9. 读取 `runtime/chapter-XXXX.intent.md`、`context.json`、`rule-stack.yaml`
-10. 检查活跃伏笔和时间线
-11. 将目标章节在 `docs/大纲.md` 中标记为“进行中”，并执行 `start`
+6. 读取 `docs/项目总纲.md`
+7. 读取 `docs/章节规划.md`
+8. 读取上一章正文
+9. 读取相关角色与设定
+10. 读取 `runtime/chapter-XXXX.intent.md`、`context.json`、`scenes.md`、`rule-stack.yaml`
+11. 检查活跃伏笔和时间线
+12. 将目标章节在 `docs/章节规划.md` 中标记为“进行中”，并执行 `start`
 
 无论是否群像，都先确认：
 
@@ -118,7 +129,7 @@
 - 不写 `# 第X章` 一类 Markdown 标题
 - 不写 `## 本章概要`、`## 正文`、`## 章节备注`
 - 不写 `---` 分隔线
-- 章节摘要、伏笔备注、下章预告写回 `task_log.md`、`docs/大纲.md` 或 `plot/伏笔记录.md`
+- 章节摘要、伏笔备注、下章预告写回 `task_log.md`、`docs/章节规划.md` 或 `plot/伏笔记录.md`
 
 正文硬性要求：
 
@@ -144,6 +155,7 @@
 - 群像模式下，单章默认只设置 1 个主 POV，必要时最多 2 个
 - 直接对话不是越多越好；高冲突场景可以密，但大段对白前后要有动作、环境、心理或转述承接
 - 连续三句以上直接对话时，把它当成复查信号，而不是格式目标；检查是否有信息能改为叙述承载
+- 平台向高压场景可启用“流断式创作”：短流段、高频断句、断点留钩，但 POV、因果和情绪必须连续，不能只碎不续
 - 不要把每个推进点都写成独立小段落或独立任务块，正文应当像一股连续水流，而不是清单推进
 - 相邻推进点之间优先补“过桥层”：上一动作留下的余波、人物反应、环境变化、视线落点、身体动作延续或因果触发
 - 如果一个转折来得太突然，先补半拍反应或观察，再推进下一步
@@ -157,7 +169,11 @@
 - 开头与章节结构：`references/chapter-guide.md`
 - 文学感较强的网文开篇：`references/literary-opening.md`
 - 定向返修微操作：`references/micro-revision-ops.md`
+- 规则化文本检查：`references/rule-linting.md`
+- 对白专审：`python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>`
 - 对话：`references/dialogue-writing.md`
+- 群像：`references/ensemble-writing.md`
+- 流断式节奏：`references/flow-break-writing.md`
 - 扩写：`references/content-expansion.md`
 - 日常叙事：`references/daily-narrative.md`
 - 钩子：`references/hook-techniques.md`
@@ -214,4 +230,4 @@
 - 结尾升华味重：删除总结句，改用未决动作、发现、选择或危险收尾
 - Beat 感太重：删掉编号式推进痕迹，合并碎段，补上余波、反应和因果桥接
 - 转折生硬：不要急着跳下一点，先补动作延续、情绪过桥、视线转移或环境反馈
-- 连贯性冲突：优先遵守 L4 宪法记忆，其次 L3 长篇治理记忆，再其次 L2 项目记忆
+- 连贯性冲突：优先遵守 L4 宪法记忆，其次 L3 结构治理记忆，再其次 L2 项目运行记忆

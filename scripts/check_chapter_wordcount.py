@@ -21,8 +21,8 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 
-def count_chinese_words(text: str) -> int:
-    """统计中文字数（排除标点符号和Markdown标记）"""
+def count_story_units(text: str) -> int:
+    """统计正文体量，中文按字计，英文/数字按词计。"""
     # 移除Markdown标记
     text = re.sub(r'#{1,6}\s*', '', text)  # 标题
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # 粗体
@@ -33,7 +33,8 @@ def count_chinese_words(text: str) -> int:
 
     # 统计中文字符（汉字）
     chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
-    return len(chinese_chars)
+    latin_words = re.findall(r'[A-Za-z0-9_]+', text)
+    return len(chinese_chars) + len(latin_words)
 
 
 def check_chapter(file_path: str, min_words: int = 3000) -> dict:
@@ -50,7 +51,7 @@ def check_chapter(file_path: str, min_words: int = 3000) -> dict:
         }
 
     main_content = extract_content_from_chapter(path)
-    word_count = count_chinese_words(main_content)
+    word_count = count_story_units(main_content)
 
     status = 'pass' if word_count >= min_words else 'fail'
     message = f'字数: {word_count}' + (

@@ -1,4 +1,0 @@
-interface:
-  display_name: "长篇网文连载"
-  short_description: "平台向长篇网文的立项、续写、多层记忆维护、阶段/卷治理与章节质检工作流"
-  default_prompt: "Use $junli-ai-novel 帮我规划平台向长篇网文主线、优化追读与卖点兑现，建立卷纲与阶段规划，或续写一个带项目记忆文件和长篇治理文件的网文工程。"
