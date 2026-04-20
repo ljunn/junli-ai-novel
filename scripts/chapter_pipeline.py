@@ -675,7 +675,7 @@ def find_chapter_file_by_number(project_dir: Path, chapter_num: int | None) -> P
     return None
 
 
-def build_chapter_intent(summary: dict, chapter_num: int, chapter_title: str | None, guidance: str, selected_sources: list[dict]) -> str:
+def build_chapter_intent(summary: dict, chapter_num: int, chapter_title: str | None, guidance: str, selected_sources: list[dict], project_dir: Path | None = None) -> str:
     goal = first_meaningful_value(guidance, summary.get("phase_goal"), summary.get("next_goal")) or "推进当前主线"
 
     must_keep: list[str] = []
@@ -747,6 +747,42 @@ def build_chapter_intent(summary: dict, chapter_num: int, chapter_title: str | N
         *source_lines,
         "",
     ]
+
+    kb_queries: list[str] = []
+    if chapter_title:
+        kb_queries.append(chapter_title)
+    if goal and goal not in {"推进当前主线"}:
+        kb_queries.append(goal)
+    for plot_row in summary.get("active_plots", [])[:2]:
+        cell = str(plot_row).lstrip("- |").split("|")[0].strip()
+        if cell and cell not in kb_queries:
+            kb_queries.append(cell)
+    if not kb_queries:
+        kb_queries.append("网文章节续写")
+
+    lines += [
+        "## Knowledge Base Query（正文前必须执行）",
+        "",
+        "在开始写正文之前，必须调用以 `coze-mcp-` 开头的知识库 MCP 工具查询相关参考材料。",
+        "",
+        "建议查询关键词（从本章目标和活跃伏笔中提取，可按需调整）：",
+        *[f"- {q}" for q in kb_queries],
+        "",
+        "执行要求：",
+        "- 至少完成一次查询，将命中的方法论或案例整合进写作策略",
+        "- 查询结果与本章 Goal / Must Keep / Writing Quick Reference 矛盾时，以后者为准",
+        "- 若 coze-mcp- 工具不可用，跳过本节，不影响后续流程",
+        "",
+    ]
+
+    quickref_path = (project_dir / "references" / "writing-quickref.md") if project_dir else None
+    if quickref_path is None:
+        quickref_path = ROOT_DIR / "references" / "writing-quickref.md"
+    if quickref_path.exists():
+        lines += ["## Writing Quick Reference", ""]
+        lines += quickref_path.read_text(encoding="utf-8").strip().splitlines()
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -951,7 +987,7 @@ def materialize_plan(project_dir: Path, summary: dict, chapter_num: int, chapter
     paths = runtime_paths(project_dir, chapter_num)
     paths["runtime_dir"].mkdir(parents=True, exist_ok=True)
     selected_sources = build_runtime_sources(project_dir, summary, chapter_num, guidance)
-    intent_content = build_chapter_intent(summary, chapter_num, chapter_title, guidance, selected_sources)
+    intent_content = build_chapter_intent(summary, chapter_num, chapter_title, guidance, selected_sources, project_dir=project_dir)
     paths["intent"].write_text(intent_content, encoding="utf-8")
     return {
         "chapter": chapter_num,
