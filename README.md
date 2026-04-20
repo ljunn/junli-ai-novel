@@ -13,15 +13,10 @@
 ## 安装
 
 ```bash
-claude skill add junli-ai-novel
+npx skills add ljunn/junli-ai-novel
 ```
 
-或手动克隆后在 Claude Code 中加载：
-
-```bash
-git clone https://github.com/ljpeng7/junli-ai-novel
-claude skill add ./junli-ai-novel
-```
+或者手动复制导入。
 
 ## 快速开始
 
