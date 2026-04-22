@@ -6,9 +6,10 @@
 
 - **立项**：5 问快速建项，主线三步法锁定终点与起爆事件
 - **续写**：自动恢复项目上下文，生成章节意图文件和场景卡，按写法原则约束正文
-- **质检**：静态预审（字数/情绪曲线/爽毒点/AI 套语检测）+ 语义审稿稿本
+- **质检**：静态预审（字数/情绪曲线/爽毒点/AI 套语检测）+ 语义审稿稿本，默认落盘到 `审阅意见/`
 - **长篇治理**：卷纲 / 阶段规划 / 变更日志 / 定期审计，防止超长篇失控平推
 - **商业化包装**：生成平台上架用的营销 Brief / Prompt Pack
+- **平台输出门禁**：按平台约束对章节稿或营销 Brief 做轻量后处理检查
 
 ## 安装
 
@@ -28,11 +29,18 @@ python3 scripts/chapter_pipeline.py init "我的小说" --mode single
 
 `--mode` 可选：`single`（单主角）/ `dual`（双主角/双视角）/ `ensemble`（群像多线）
 
+`init` 会直接创建一个可自动生成长篇连载的项目骨架：治理模板、默认目标总字数、当前卷/阶段和阶段目标都会预置好，开箱即可走 `next-chapter` 自动链路。
+
 ### 续写下一章
 
 ```bash
 # 准备阶段（生成 intent 文件和场景卡）
 python3 scripts/chapter_pipeline.py next-chapter ./我的小说 --chapter-title "第一战"
+
+# 导入旧项目但想立刻按长篇治理门槛执行时
+python3 scripts/chapter_pipeline.py next-chapter ./我的小说 \
+  --chapter-title "第一战" \
+  --require-longform-governance
 
 # 正文写完后闭环
 python3 scripts/chapter_pipeline.py next-chapter ./我的小说 \
@@ -48,10 +56,23 @@ python3 scripts/chapter_pipeline.py review ./我的小说/manuscript/0001_第一
   --project-path ./我的小说
 ```
 
+默认会生成 Markdown 审阅报告到 `./我的小说/审阅意见/`。只想看终端摘要时可加 `--no-write-report`，也可用 `--report-path` 指定输出位置。
+
+如需同类案例、题材范本或结构参考，请通过外部知识库 / MCP / 搜索工具查询；`plan` 生成的 intent 会给出建议查询词。
+
+### 平台输出门禁
+
+```bash
+python3 scripts/chapter_pipeline.py platform-gate ./我的小说/manuscript/0001_第一战.md \
+  --platform 起点中文网
+```
+
+`marketing --platform` 会自动带出平台门禁清单；`platform-gate` 用来对章节稿或营销 Brief 做后处理检查。
+
 ### 长篇治理
 
 ```bash
-# 初始化治理文件（超过 20 章或 30 万字后触发）
+# 旧项目补齐或重建治理模板，并恢复自动生成所需的默认治理状态
 python3 scripts/chapter_pipeline.py bootstrap-longform ./我的小说
 
 # 同步当前卷/阶段状态
@@ -61,14 +82,18 @@ python3 scripts/chapter_pipeline.py governance ./我的小说 \
   --phase-goal "主角立足"
 ```
 
+阶段审计会在超过 20 章未执行时被 `preflight / start / next-chapter` 自动拦截；卷审计仍需在卷末或换卷时手动执行 `audit --scope volume`。对于从旧仓库迁移进来的项目，可用 `bootstrap-longform` 一次性补齐自动生成链路需要的治理默认值。
+
 ## 项目结构
 
 ```
 junli-ai-novel/
 ├── scripts/
 │   └── chapter_pipeline.py   # 统一命令入口
-├── references/               # 写作方法论（32 篇，含写法速查）
+├── references/               # 写作方法论与流程说明
 ├── rules/novel-lint/         # 规则化文本巡检（AI 套语 / 对白 / 视角越权等）
+├── 审阅意见/                # review 命令生成的章节审阅报告
+├── runtime/                  # marketing brief / platform gate 等运行时工件
 ├── agents/                   # Agent 接入配置
 ├── SKILL.md                  # AI 操作宪法（含写法原则）
 └── PROJECT.md                # 任务分流入口

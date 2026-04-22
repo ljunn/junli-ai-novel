@@ -16,7 +16,7 @@ SEPARATOR_RE = re.compile(r"^\s*---\s*$")
 
 def is_chapter_file(path: Path) -> bool:
     name = path.name
-    return bool(re.match(r"^\d{3}[_-].+\.md$", name)) or ("第" in name and "章" in name and name.endswith(".md"))
+    return bool(re.match(r"^\d{3,4}[_-].+\.md$", name)) or ("第" in name and "章" in name and name.endswith(".md"))
 
 
 def extract_body_section(content: str) -> str:

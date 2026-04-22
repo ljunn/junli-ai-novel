@@ -398,6 +398,7 @@ def update_progress(
     pending_setting_sync: str | None = None,
     plot_note: str | None = None,
     status: str = STATUS_DONE,
+    silent: bool = False,
 ) -> None:
     project_dir = Path(project_path).expanduser().resolve()
     log_path = project_dir / "task_log.md"
@@ -465,8 +466,9 @@ def update_progress(
     if plot_note and status == STATUS_DONE:
         append_plot_note(project_dir, plot_note, chapter_label)
 
-    action = "进入创作中" if status == STATUS_IN_PROGRESS else f"已完成，累计 {total_words} 字"
-    print(f"进度已更新：{latest_chapter}，{action}")
+    if not silent:
+        action = "进入创作中" if status == STATUS_IN_PROGRESS else f"已完成，累计 {total_words} 字"
+        print(f"进度已更新：{latest_chapter}，{action}")
 
 
 def update_governance_state(

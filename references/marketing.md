@@ -40,6 +40,12 @@
 - 补充词库
 - 参考摘录
 
+当传入 `--platform` 且命中内置平台时，还会自动附带：
+
+- 平台输出门禁
+- 平台重点
+- 平台禁行项
+
 ## 命令入口
 
 基础用法：
@@ -82,6 +88,14 @@ python3 scripts/chapter_pipeline.py marketing <项目目录> \
   --output-file ./runtime/marketing-brief.md
 ```
 
+对生成后的 Brief 继续跑平台门禁：
+
+```bash
+python3 scripts/chapter_pipeline.py platform-gate ./runtime/marketing-brief.md \
+  --platform 起点中文网 \
+  --kind marketing
+```
+
 ## 使用原则
 
 1. 商业化包装不能和 `docs/作者意图.md` 的长期承诺打架。
@@ -89,3 +103,4 @@ python3 scripts/chapter_pipeline.py marketing <项目目录> \
 3. AI 味词汇只作为辅助，不要让文案全变成平台黑话堆砌。
 4. 参考材料只吸收结构、角度和节奏，不直接照搬别人文案。
 5. 最近 1-3 章的宣传重点，应服务当前阶段目标，而不是乱开新坑。
+6. 生成 Brief 后，优先再跑一次 `platform-gate` 做后处理检查。
