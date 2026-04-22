@@ -152,6 +152,7 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 - 文笔优先按“四层模型”运转：旁白负责必要交代，画面负责场面成立，思想负责 POV 内部推进，情绪尽量藏进动作、环境和细节，不直说大词
 - 场景不要写成悬浮皮影戏；尽量让人物和环境发生实际接触，例如抓、碰、躲、借、踩、闻、撞、顺手利用身边物件
 - 优先追求“一笔多用”：一个动作、物件或细节，最好同时服务情绪、人设、伏笔、关系或后续功能
+- 写干了先别堆形容词，先判断这一段主要在写人 / 写景 / 写物 / 写事哪一类，再去补对应观察维度；每段只抓 `1 个主体 + 2 个维度 + 1 个变化`
 - 群像模式下，单章默认只设置 1 个主 POV，必要时最多 2 个
 - 直接对话不是越多越好；高冲突场景可以密，但大段对白前后要有动作、环境、心理或转述承接
 - 连续三句以上直接对话时，把它当成复查信号，而不是格式目标；检查是否有信息能改为叙述承载
@@ -171,6 +172,7 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 - 定向返修微操作：`references/micro-revision-ops.md`
 - 规则化文本检查：`references/rule-linting.md`
 - 去 AI 味返修：`references/anti-ai-rewrite.md`
+- 分类写法 / 去悬浮：`references/descriptive-taxonomy.md`
 - 对白专审：`python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>`
 - 对话：`references/dialogue-writing.md`
 - 群像：`references/ensemble-writing.md`
