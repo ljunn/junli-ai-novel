@@ -66,15 +66,18 @@ python3 scripts/chapter_pipeline.py finish <项目目录> <章节号> <章节文
    - 目标字数超过 100 万字
    - 实际已写超过 30 万字
    - 项目已写到 20 章以上
-   - 用户明确要求分卷、阶段、卷末结算、结构变更、超长篇控盘（此条由 AI 自行判断，工具不检测）
+   - 用户明确要求分卷、阶段、卷末结算、结构变更、超长篇控盘；命令行工作流可显式加 `--require-longform-governance`
 
-5. 长篇治理范围内，缺治理文件时先跑：
+5. `init` 创建的新项目默认就是“全自动生成长篇连载”的就绪状态：治理模板、目标总字数、当前卷/阶段/阶段目标都会自动预置。旧项目或治理模板缺失时，先跑：
 
 ```bash
 python3 scripts/chapter_pipeline.py bootstrap-longform <项目目录>
 ```
 
 6. 长篇治理范围内，每 10-20 章必须跑阶段审计；每卷结束必须跑卷审计：
+   - `preflight` / `start` / `next-chapter` 会在阶段审计超过 20 章未执行时阻塞
+   - 卷审计目前不自动推断卷末，卷末结算或换卷时必须手动执行 `audit --scope volume`
+   - `bootstrap-longform` 不只是补模板，也会恢复自动生成链路所需的默认治理状态
 
 ```bash
 python3 scripts/chapter_pipeline.py audit <项目目录> --scope stage

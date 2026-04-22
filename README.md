@@ -30,11 +30,18 @@ python3 scripts/chapter_pipeline.py init "我的小说" --mode single
 
 `--mode` 可选：`single`（单主角）/ `dual`（双主角/双视角）/ `ensemble`（群像多线）
 
+`init` 会直接创建一个可自动生成长篇连载的项目骨架：治理模板、默认目标总字数、当前卷/阶段和阶段目标都会预置好，开箱即可走 `next-chapter` 自动链路。
+
 ### 续写下一章
 
 ```bash
 # 准备阶段（生成 intent 文件和场景卡）
 python3 scripts/chapter_pipeline.py next-chapter ./我的小说 --chapter-title "第一战"
+
+# 导入旧项目但想立刻按长篇治理门槛执行时
+python3 scripts/chapter_pipeline.py next-chapter ./我的小说 \
+  --chapter-title "第一战" \
+  --require-longform-governance
 
 # 正文写完后闭环
 python3 scripts/chapter_pipeline.py next-chapter ./我的小说 \
@@ -77,7 +84,7 @@ python3 scripts/chapter_pipeline.py platform-gate ./我的小说/manuscript/0001
 ### 长篇治理
 
 ```bash
-# 初始化治理文件（超过 20 章或 30 万字后触发）
+# 旧项目补齐或重建治理模板，并恢复自动生成所需的默认治理状态
 python3 scripts/chapter_pipeline.py bootstrap-longform ./我的小说
 
 # 同步当前卷/阶段状态
@@ -86,6 +93,8 @@ python3 scripts/chapter_pipeline.py governance ./我的小说 \
   --current-phase "阶段1" \
   --phase-goal "主角立足"
 ```
+
+阶段审计会在超过 20 章未执行时被 `preflight / start / next-chapter` 自动拦截；卷审计仍需在卷末或换卷时手动执行 `audit --scope volume`。对于从旧仓库迁移进来的项目，可用 `bootstrap-longform` 一次性补齐自动生成链路需要的治理默认值。
 
 ## 项目结构
 

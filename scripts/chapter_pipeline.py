@@ -20,7 +20,7 @@ LONGFORM_FALLBACK_TOTAL_WORDS = 300_000
 LONGFORM_FALLBACK_CHAPTERS = 20
 
 try:
-    from chapter_text import is_chapter_file
+    from chapter_text import extract_body_section, is_chapter_file
     from check_chapter_wordcount import check_chapter
     from check_emotion_curve import analyze_chapter_emotion_curve
     from corpus_index import (
@@ -46,7 +46,7 @@ try:
         update_progress,
     )
 except ModuleNotFoundError:
-    from scripts.chapter_text import is_chapter_file
+    from scripts.chapter_text import extract_body_section, is_chapter_file
     from scripts.check_chapter_wordcount import check_chapter
     from scripts.check_emotion_curve import analyze_chapter_emotion_curve
     from scripts.corpus_index import (
@@ -322,6 +322,14 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
+def extract_chapter_body_text(text: str) -> str:
+    return extract_body_section(text)
+
+
+def read_chapter_body_text(path: Path) -> str:
+    return extract_chapter_body_text(read_text(path))
+
+
 def extract_state_field(text: str, label: str, default: str = "无") -> str:
     match = re.search(rf"(?m)^- {re.escape(label)}(.*)$", text)
     if not match:
@@ -443,6 +451,8 @@ def update_task_log_audit(project_dir: Path, scope: str, status: str, summary_li
 
 
 def requires_longform_governance(project_dir: Path, summary: dict) -> bool:
+    if bool(summary.get("force_longform_governance")):
+        return True
     chapter_count, total_words = compute_manuscript_stats(project_dir)
     target_words = parse_count_value(summary.get("planned_total_words", ""))
     if target_words and target_words >= LONGFORM_TARGET_WORDS:
@@ -526,6 +536,8 @@ def summarize_project(project_dir: Path) -> dict:
 
 def collect_summary_overrides(args: argparse.Namespace) -> dict[str, Any]:
     overrides: dict[str, Any] = {}
+    if getattr(args, "require_longform_governance", False):
+        overrides["force_longform_governance"] = True
     for arg_name, summary_key in SUMMARY_OVERRIDE_FIELD_MAP:
         if not hasattr(args, arg_name):
             continue
@@ -891,7 +903,7 @@ def build_chapter_intent(
         must_keep.append(f"本章仍属于{summary['current_volume']}，不要写成跨卷结算。")
     if summary.get("current_phase") not in {"未记录", "未开始", "无", ""}:
         must_keep.append(f"本章必须服务{summary['current_phase']}。")
-    if summary.get("phase_goal") not in {"未记录", "无", ""}:
+    if summary.get("phase_goal") not in {"未记录", "未开始", "无", ""}:
         must_keep.append(f"阶段目标：{summary['phase_goal']}")
     if summary.get("protagonist_state") not in {"未记录", "无", ""}:
         must_keep.append(f"主角当前状态：{summary['protagonist_state']}")
@@ -989,17 +1001,17 @@ def build_chapter_intent(
         kb_queries.append("网文章节续写")
 
     lines += [
-        "## Knowledge Base Query（正文前必须执行）",
+        "## Knowledge Base Query（可选增强）",
         "",
-        "在开始写正文之前，必须调用以 `coze-mcp-` 开头的知识库 MCP 工具查询相关参考材料。",
+        "若当前环境提供知识库 / MCP / 搜索工具，可在正文前先检索相关参考材料；若没有，直接跳过。",
         "",
         "建议查询关键词（从本章目标和活跃伏笔中提取，可按需调整）：",
         *[f"- {q}" for q in kb_queries],
         "",
-        "执行要求：",
-        "- 至少完成一次查询，将命中的方法论或案例整合进写作策略",
-        "- 查询结果与本章 Goal / Must Keep / Writing Quick Reference 矛盾时，以后者为准",
-        "- 若 coze-mcp- 工具不可用，跳过本节，不影响后续流程",
+        "执行建议：",
+        "- 优先查询与本章目标、活跃伏笔直接相关的案例、方法论或结构参考",
+        "- 查询结果只作补充参考；若与 Goal / Must Keep / Writing Quick Reference 冲突，以后者为准",
+        "- 当前环境没有可用工具时，跳过本节，不影响后续流程",
         "",
     ]
 
@@ -1388,6 +1400,7 @@ def print_gate_failures_or_json(
 def evaluate_preflight(project_dir: Path, summary_overrides: dict[str, Any] | None = None) -> tuple[dict, list[str]]:
     summary = apply_summary_overrides(summarize_project(project_dir), summary_overrides)
     chapter_count, _ = compute_manuscript_stats(project_dir)
+    longform_required = requires_longform_governance(project_dir, summary)
 
     failures: list[str] = []
     if summary["missing_files"]:
@@ -1396,20 +1409,22 @@ def evaluate_preflight(project_dir: Path, summary_overrides: dict[str, Any] | No
         failures.append("task_log.md 未记录创作阶段")
     if summary["next_goal"] in {"未记录", "无", ""}:
         failures.append("task_log.md 未记录下一章目标")
-    if requires_longform_governance(project_dir, summary) and summary["missing_longform_files"]:
+    if longform_required and summary["missing_longform_files"]:
         failures.append("已进入长篇治理范围，但缺失全书宪法/卷纲/阶段规划/变更日志；先执行 bootstrap-longform")
-    if requires_longform_governance(project_dir, summary) and summary["current_volume"] in {"未记录", "未开始", "无", ""}:
+    if longform_required and summary["current_volume"] in {"未记录", "未开始", "无", ""}:
         failures.append("长篇项目未记录当前卷，禁止继续推进")
-    if requires_longform_governance(project_dir, summary) and summary["current_phase"] in {"未记录", "未开始", "无", ""}:
+    if longform_required and summary["current_phase"] in {"未记录", "未开始", "无", ""}:
         failures.append("长篇项目未记录当前阶段，禁止继续推进")
-    if requires_longform_governance(project_dir, summary) and stage_audit_is_stale(summary, chapter_count):
+    if longform_required and summary["phase_goal"] in {"未记录", "未开始", "无", ""}:
+        failures.append("长篇项目未记录当前阶段目标，禁止继续推进")
+    if longform_required and stage_audit_is_stale(summary, chapter_count):
         failures.append("阶段审计已过期，先执行 audit --scope stage 再继续正文")
     return summary, failures
 
 
 def handle_preflight(args: argparse.Namespace) -> int:
     project_dir = Path(args.project_path).expanduser().resolve()
-    summary, failures = evaluate_preflight(project_dir)
+    summary, failures = evaluate_preflight(project_dir, summary_overrides=collect_summary_overrides(args))
     print_resume_summary(summary)
 
     if failures:
@@ -1422,7 +1437,7 @@ def handle_preflight(args: argparse.Namespace) -> int:
 
 def build_check_report(chapter_path: Path, rule_project_dir: Path | None = None) -> dict:
     rules = load_lint_rules(resolve_rule_project_dir(chapter_path=chapter_path, project_dir=rule_project_dir))
-    chapter_text = chapter_path.read_text(encoding="utf-8") if chapter_path.exists() else ""
+    chapter_text = read_chapter_body_text(chapter_path)
     return {
         "wordcount": check_chapter(str(chapter_path)),
         "emotion": analyze_chapter_emotion_curve(str(chapter_path)),
@@ -1479,7 +1494,7 @@ def handle_lint(args: argparse.Namespace) -> int:
         return 2
 
     rules = load_lint_rules(resolve_rule_project_dir(chapter_path=chapter_path, rule_set=args.rule_set), rule_set=args.rule_set)
-    content = chapter_path.read_text(encoding="utf-8")
+    content = read_chapter_body_text(chapter_path)
     findings = lint_chapter_text(content, rules)
 
     if args.json:
@@ -1645,7 +1660,10 @@ def build_review_dossier(
     previous_excerpt = ""
 
     if consistency_report.get("previous_chapter"):
-        previous_excerpt = excerpt_text(read_text(Path(consistency_report["previous_chapter"])), max_chars=260)
+        previous_excerpt = excerpt_text(
+            read_chapter_body_text(Path(consistency_report["previous_chapter"])),
+            max_chars=260,
+        )
 
     opening_matches = collect_signal_matches(opening_excerpt, OPENING_HOOK_PATTERNS)
     ending_matches = collect_signal_matches(ending_excerpt, ENDING_HOOK_PATTERNS)
@@ -1776,7 +1794,7 @@ def build_review_dossier(
 def build_review_report(chapter_path: Path, project_dir: Path | None = None) -> dict[str, Any]:
     effective_rule_project_dir = resolve_rule_project_dir(chapter_path=chapter_path, project_dir=project_dir)
     check_report = build_check_report(chapter_path, rule_project_dir=effective_rule_project_dir)
-    content = chapter_path.read_text(encoding="utf-8") if chapter_path.exists() else ""
+    content = read_chapter_body_text(chapter_path)
     dialogue_stats = extract_dialogue_stats(content) if content else extract_dialogue_stats("")
     dialogue_rules = [
         rule
@@ -2375,7 +2393,7 @@ def handle_dialogue_pass(args: argparse.Namespace) -> int:
         print(json.dumps({"error": f"文件不存在: {chapter_path}"}, ensure_ascii=False, indent=2))
         return 2
 
-    content = chapter_path.read_text(encoding="utf-8")
+    content = read_chapter_body_text(chapter_path)
     stats = extract_dialogue_stats(content)
     rules = [
         rule
@@ -2468,20 +2486,24 @@ def collect_start_failures(args: argparse.Namespace, project_dir: Path, summary:
     effective_next_goal = args.next_goal or summary["next_goal"]
     effective_current_volume = args.current_volume or summary["current_volume"]
     effective_current_phase = args.current_phase or summary["current_phase"]
+    effective_phase_goal = args.phase_goal or summary["phase_goal"]
+    longform_required = requires_longform_governance(project_dir, summary)
 
     failures: list[str] = []
     if summary["missing_files"]:
         failures.append("缺失项目记忆文件，先修记忆，再标记章节进行中")
-    if requires_longform_governance(project_dir, summary) and summary["missing_longform_files"]:
+    if longform_required and summary["missing_longform_files"]:
         failures.append("缺失超长篇治理文件，先执行 bootstrap-longform")
     if effective_next_goal in {"未记录", "无", ""}:
         failures.append("未记录下一章目标，start 前必须先补 task_log.md 或传入 --next-goal")
     if current_chapter_num not in {None, args.chapter_num} and summary["current_chapter"] != "无":
         failures.append(f"当前已有进行中章节：{summary['current_chapter']}，不要并发开写多个章节")
-    if requires_longform_governance(project_dir, summary) and effective_current_volume in {"未记录", "未开始", "无", ""}:
+    if longform_required and effective_current_volume in {"未记录", "未开始", "无", ""}:
         failures.append("start 前必须先明确当前卷")
-    if requires_longform_governance(project_dir, summary) and effective_current_phase in {"未记录", "未开始", "无", ""}:
+    if longform_required and effective_current_phase in {"未记录", "未开始", "无", ""}:
         failures.append("start 前必须先明确当前阶段")
+    if longform_required and effective_phase_goal in {"未记录", "未开始", "无", ""}:
+        failures.append("start 前必须先明确当前阶段目标")
     return failures
 
 
@@ -2493,12 +2515,22 @@ def collect_finish_failures(
 ) -> list[str]:
     target_label = f"第{args.chapter_num}章"
     current_chapter_num = parse_chapter_number_from_text(summary["current_chapter"])
+    effective_current_volume = args.current_volume or summary["current_volume"]
+    effective_current_phase = args.current_phase or summary["current_phase"]
+    effective_phase_goal = args.phase_goal or summary["phase_goal"]
+    longform_required = requires_longform_governance(project_dir, summary)
 
     failures: list[str] = []
     if summary["missing_files"]:
         failures.append("缺失项目记忆文件，finish 前必须先恢复项目记忆")
-    if requires_longform_governance(project_dir, summary) and summary["missing_longform_files"]:
+    if longform_required and summary["missing_longform_files"]:
         failures.append("缺失超长篇治理文件，finish 前必须先补齐")
+    if longform_required and effective_current_volume in {"未记录", "未开始", "无", ""}:
+        failures.append("finish 前必须先明确当前卷")
+    if longform_required and effective_current_phase in {"未记录", "未开始", "无", ""}:
+        failures.append("finish 前必须先明确当前阶段")
+    if longform_required and effective_phase_goal in {"未记录", "未开始", "无", ""}:
+        failures.append("finish 前必须先明确当前阶段目标")
     if current_chapter_num != args.chapter_num:
         failures.append(f"当前处理章节不是 {target_label}，请先执行 start 并保持章节状态一致")
     if not chapter_path.exists():
@@ -2543,6 +2575,7 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
         current_volume=args.current_volume,
         current_phase=args.current_phase,
         phase_goal=args.phase_goal,
+        require_longform_governance=getattr(args, "require_longform_governance", False),
         pending_setting_sync=args.pending_setting_sync,
         plot_note=args.plot_note,
     )
@@ -2611,6 +2644,7 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
             current_volume=args.current_volume,
             current_phase=args.current_phase,
             phase_goal=args.phase_goal,
+            require_longform_governance=getattr(args, "require_longform_governance", False),
             pending_setting_sync=args.pending_setting_sync,
             plot_note=args.plot_note,
             chapter_path=args.chapter_path,
@@ -2619,7 +2653,7 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
             skip_checks=args.skip_checks,
         )
         chapter_path = Path(finish_args.chapter_path).expanduser().resolve()
-        finish_summary = summarize_project(project_dir)
+        finish_summary = apply_summary_overrides(summarize_project(project_dir), collect_summary_overrides(finish_args))
         finish_failures = collect_finish_failures(finish_args, project_dir, finish_summary, chapter_path)
         if finish_failures:
             print_gate_failures_or_json(
@@ -2759,15 +2793,16 @@ def build_platform_chapter_gate_report(
             "platform_avoid": profile.get("brief_avoid", []),
         }
 
+    body_text = extract_chapter_body_text(text)
     check_report = build_check_report(input_path, rule_project_dir=project_dir)
     lint_findings = check_report.get("lint", [])
-    paragraphs = split_paragraph_units(text)
+    paragraphs = split_paragraph_units(body_text)
     opening_excerpt = join_units_text(paragraphs[: min(3, len(paragraphs))])
     ending_excerpt = join_units_text(paragraphs[-min(2, len(paragraphs)):])
     opening_matches = collect_signal_matches(opening_excerpt, OPENING_HOOK_PATTERNS)
     ending_matches = collect_signal_matches(ending_excerpt, ENDING_HOOK_PATTERNS)
     ending_summary_hit = any(item.get("id") == "ending_summary" for item in lint_findings)
-    dialogue_stats = extract_dialogue_stats(text)
+    dialogue_stats = extract_dialogue_stats(body_text)
     word_range = profile.get("chapter_word_range")
     min_words, max_words = word_range if word_range else (0, 10**9)
     word_count = check_report["wordcount"].get("word_count", 0)
@@ -3145,6 +3180,11 @@ def add_progress_option_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--current-volume", help="当前卷，例如 第一卷")
     parser.add_argument("--current-phase", help="当前阶段，例如 阶段1")
     parser.add_argument("--phase-goal", help="当前阶段目标")
+    parser.add_argument(
+        "--require-longform-governance",
+        action="store_true",
+        help="即使当前字数/章节数未达阈值，也按长篇治理门槛执行",
+    )
     parser.add_argument("--pending-setting-sync", help="待同步的设定变更摘要")
     parser.add_argument("--plot-note", help="新增伏笔备注")
 
@@ -3249,14 +3289,15 @@ def handle_start(args: argparse.Namespace) -> int:
 
 def handle_check(args: argparse.Namespace) -> int:
     chapter_path = Path(args.chapter_path).expanduser().resolve()
-    print_check_summary(build_check_report(chapter_path, rule_project_dir=resolve_rule_project_dir(chapter_path=chapter_path)))
-    return 0
+    report = build_check_report(chapter_path, rule_project_dir=resolve_rule_project_dir(chapter_path=chapter_path))
+    print_check_summary(report)
+    return 0 if report["wordcount"].get("exists") else 2
 
 
 def handle_finish(args: argparse.Namespace) -> int:
     project_dir = Path(args.project_path).expanduser().resolve()
     chapter_path = Path(args.chapter_path).expanduser().resolve()
-    summary = summarize_project(project_dir)
+    summary = apply_summary_overrides(summarize_project(project_dir), collect_summary_overrides(args))
     failures = collect_finish_failures(args, project_dir, summary, chapter_path)
 
     if failures:
@@ -3337,7 +3378,7 @@ def build_audit_payload(project_dir: Path, scope: str) -> tuple[dict, list[str],
     if scope == "stage":
         if summary["current_phase"] in {"未记录", "未开始", "无", ""}:
             issues.append("未记录当前阶段")
-        if summary["phase_goal"] in {"未记录", "无", ""}:
+        if summary["phase_goal"] in {"未记录", "未开始", "无", ""}:
             issues.append("未记录当前阶段目标")
         phase_plan = read_text(project_dir / "docs" / "阶段规划.md")
         current_phase = summary["current_phase"]
@@ -3481,6 +3522,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     preflight_parser = subparsers.add_parser("preflight", help="续写/开写前的硬门槛校验")
     preflight_parser.add_argument("project_path", help="项目根目录")
+    preflight_parser.add_argument(
+        "--require-longform-governance",
+        action="store_true",
+        help="即使当前字数/章节数未达阈值，也按长篇治理门槛执行",
+    )
     preflight_parser.set_defaults(handler=handle_preflight)
 
     start_parser = subparsers.add_parser("start", help="将目标章节标记为进行中")

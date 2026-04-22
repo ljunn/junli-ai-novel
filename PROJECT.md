@@ -40,6 +40,8 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 
 串联：`preflight → resume → plan → compose → start`
 
+`init` 创建的新项目默认就是可直接自动生成长篇连载的状态；如果导入旧项目且想立刻按长篇治理规则执行，可额外加 `--require-longform-governance`。
+
 正文写完后，同一条命令闭环：
 
 ```bash
@@ -74,6 +76,12 @@ python3 scripts/chapter_pipeline.py bootstrap-longform <项目目录>
 python3 scripts/chapter_pipeline.py governance <项目目录> --current-volume "第一卷" --current-phase "阶段1" --phase-goal "目标"
 python3 scripts/chapter_pipeline.py audit <项目目录> --scope stage
 ```
+
+说明：
+- `init` 创建的新项目会预置治理模板和默认治理状态，开箱即可自动续写。
+- `bootstrap-longform` 会为旧项目补齐治理模板，并恢复自动生成所需的默认卷/阶段/阶段目标。
+- 如果旧项目尚未达到阈值，但你想立刻按长篇治理执行，可在 `preflight / start / next-chapter / finish` 上加 `--require-longform-governance`。
+- 阶段审计会在超过 20 章未执行时自动阻塞；卷审计目前不自动推断卷末，卷末/换卷时要手动执行 `audit --scope volume`。
 
 ### 商业化包装
 
