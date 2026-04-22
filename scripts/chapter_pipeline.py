@@ -23,6 +23,14 @@ try:
     from chapter_text import is_chapter_file
     from check_chapter_wordcount import check_chapter
     from check_emotion_curve import analyze_chapter_emotion_curve
+    from corpus_index import (
+        available_tags as corpus_available_tags,
+        available_types as corpus_available_types,
+        build_corpus_assets,
+        render_reference_markdown,
+        search_corpus_examples,
+        select_corpus_examples,
+    )
     from extract_thrills import analyze_thrills_and_poisons
     from new_project import create_novel_project, ensure_longform_governance_files
     from update_progress import (
@@ -41,6 +49,14 @@ except ModuleNotFoundError:
     from scripts.chapter_text import is_chapter_file
     from scripts.check_chapter_wordcount import check_chapter
     from scripts.check_emotion_curve import analyze_chapter_emotion_curve
+    from scripts.corpus_index import (
+        available_tags as corpus_available_tags,
+        available_types as corpus_available_types,
+        build_corpus_assets,
+        render_reference_markdown,
+        search_corpus_examples,
+        select_corpus_examples,
+    )
     from scripts.extract_thrills import analyze_thrills_and_poisons
     from scripts.new_project import create_novel_project, ensure_longform_governance_files
     from scripts.update_progress import (
@@ -68,6 +84,29 @@ LONGFORM_GOVERNANCE_FILES = (
     "docs/卷纲.md",
     "docs/阶段规划.md",
     "docs/变更日志.md",
+)
+
+SUMMARY_OVERRIDE_FIELD_MAP: tuple[tuple[str, str], ...] = (
+    ("stage", "stage"),
+    ("target_total_words", "planned_total_words"),
+    ("target_volumes", "target_volumes"),
+    ("current_volume", "current_volume"),
+    ("current_phase", "current_phase"),
+    ("phase_goal", "phase_goal"),
+    ("pending_setting_sync", "pending_setting_sync"),
+    ("viewpoint", "viewpoint"),
+    ("protagonist_location", "protagonist_location"),
+    ("protagonist_state", "protagonist_state"),
+    ("next_goal", "next_goal"),
+)
+
+MARKETING_PLACEHOLDER_SIGNALS = (
+    "未从 docs/",
+    "未读取到",
+    "暂无",
+    "待补",
+    "todo",
+    "tbd",
 )
 
 RULE_LAYER_CATALOG: list[dict[str, Any]] = [
@@ -133,6 +172,12 @@ WORKFLOW_LAYER_CATALOG: list[dict[str, Any]] = [
         "steps": ["resume", "作者意图", "当前焦点", "项目总纲/章节规划", "补充提示词/参考"],
         "summary": "把营销包装所需的信息、提示词、词库和参考统一编译成营销 Brief。",
     },
+    {
+        "id": "platform-gate",
+        "title": "平台输出门禁",
+        "steps": ["marketing", "platform-gate"],
+        "summary": "按平台约束检查章节稿或营销 Brief，输出轻量后处理报告。",
+    },
 ]
 
 COMMAND_LAYER_CATALOG: list[dict[str, Any]] = [
@@ -142,6 +187,14 @@ COMMAND_LAYER_CATALOG: list[dict[str, Any]] = [
             "rules",
             "workflows",
             "commands",
+        ],
+    },
+    {
+        "group": "Tool",
+        "commands": [
+            "corpus-build",
+            "corpus-search",
+            "platform-gate",
         ],
     },
     {
@@ -180,6 +233,89 @@ CONSISTENCY_MANUAL_CHECKS = [
     "主 POV 稳定，没有同段乱切脑内",
     "信息暴露符合 POV 边界，没有作者越权透题",
 ]
+
+PLATFORM_GATE_PROFILES: dict[str, dict[str, Any]] = {
+    "起点中文网": {
+        "aliases": ["起点", "qidian"],
+        "output_mode": "长篇连载",
+        "chapter_word_range": (2500, 6000),
+        "dialogue_avg_max": 30,
+        "opening_hook_min_signals": 2,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["题材钩子一眼可见", "长期升级或关系回报能持续供血", "章末追更驱动明确"],
+        "brief_avoid": ["只讲氛围不讲卖点", "把连载文案写成完结总结", "文学腔压过平台感"],
+    },
+    "番茄小说网": {
+        "aliases": ["番茄", "番茄小说", "tomato"],
+        "output_mode": "平台向快节奏连载",
+        "chapter_word_range": (1800, 4500),
+        "dialogue_avg_max": 26,
+        "opening_hook_min_signals": 2,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["前台冲突直给", "主角受压后尽快给补偿或反制基础", "简介要能一口气读完"],
+        "brief_avoid": ["慢热铺垫过长", "只讲世界观不讲人", "结尾没有下一章驱动力"],
+    },
+    "七猫小说": {
+        "aliases": ["七猫", "七猫免费小说"],
+        "output_mode": "爽点导向长篇连载",
+        "chapter_word_range": (1800, 4500),
+        "dialogue_avg_max": 28,
+        "opening_hook_min_signals": 2,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["强冲突和高回报直连", "卖点表达直接", "章节结尾持续抬压"],
+        "brief_avoid": ["文案过虚", "长段说明盖过事件", "只讲情绪不讲结果"],
+    },
+    "知乎盐选": {
+        "aliases": ["知乎", "盐选", "知乎盐言故事"],
+        "output_mode": "高概念强反转付费故事",
+        "chapter_word_range": (3500, 9000),
+        "dialogue_avg_max": 32,
+        "opening_hook_min_signals": 1,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["高概念一句话能立住", "关系或价值冲突清晰", "反转和付费点可前置"],
+        "brief_avoid": ["长篇连载腔过重", "铺陈太久才进入主矛盾", "只剩气氛没有反转承诺"],
+    },
+    "微信订阅号": {
+        "aliases": ["微信", "订阅号", "公众号", "微信订阅号"],
+        "output_mode": "可传播章节稿 / 连载推文",
+        "chapter_word_range": (1500, 3500),
+        "dialogue_avg_max": 26,
+        "opening_hook_min_signals": 2,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["标题和导语易传播", "单篇内有明确冲突回路", "适合转发讨论的情绪抓手"],
+        "brief_avoid": ["篇幅过长失去分享效率", "段落过密像墙", "卖点埋太深"],
+    },
+    "豆瓣阅读": {
+        "aliases": ["豆瓣", "豆瓣阅读"],
+        "output_mode": "偏文学气质的商业长篇",
+        "chapter_word_range": (3000, 7000),
+        "dialogue_avg_max": 34,
+        "opening_hook_min_signals": 1,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["人物和关系质感清楚", "题材标签准确", "气质与冲突并存"],
+        "brief_avoid": ["纯平台黑话堆砌", "只卖爽点不卖人物", "文案承诺和正文气质冲突"],
+    },
+    "WebNovel": {
+        "aliases": ["webnovel", "web novel"],
+        "output_mode": "海外短更连载",
+        "chapter_word_range": (1200, 3000),
+        "dialogue_avg_max": 24,
+        "opening_hook_min_signals": 2,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["设定和主冲突尽快讲清", "段落短、钩子密", "一句话就能明白主卖点"],
+        "brief_avoid": ["世界观名词轰炸", "段落过长", "结尾没有 cliffhanger"],
+    },
+    "出版社稿": {
+        "aliases": ["出版社", "出版", "出版社版", "出版向"],
+        "output_mode": "出版向长篇稿",
+        "chapter_word_range": (4000, 8000),
+        "dialogue_avg_max": 36,
+        "opening_hook_min_signals": 1,
+        "ending_hook_min_signals": 1,
+        "brief_focus": ["主题、人物、结构说得稳", "题材承诺和文本气质一致", "营销信息不过火"],
+        "brief_avoid": ["平台黑话密度过高", "承诺过度夸张", "只剩钩子不见文本可信度"],
+    },
+}
 
 
 def read_text(path: Path) -> str:
@@ -388,6 +524,40 @@ def summarize_project(project_dir: Path) -> dict:
     }
 
 
+def collect_summary_overrides(args: argparse.Namespace) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    for arg_name, summary_key in SUMMARY_OVERRIDE_FIELD_MAP:
+        if not hasattr(args, arg_name):
+            continue
+        value = getattr(args, arg_name)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                continue
+        overrides[summary_key] = value
+    return overrides
+
+
+def apply_summary_overrides(summary: dict[str, Any], overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    if not overrides:
+        return summary
+
+    merged = dict(summary)
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        if isinstance(value, str):
+            normalized = value.strip()
+            if not normalized:
+                continue
+            merged[key] = normalized
+            continue
+        merged[key] = value
+    return merged
+
+
 def determine_target_chapter_num(project_dir: Path, summary: dict, explicit: int | None = None) -> int:
     if explicit is not None:
         return explicit
@@ -442,6 +612,7 @@ def runtime_paths(project_dir: Path, chapter_num: int) -> dict[str, Path]:
         "runtime_dir": runtime_dir,
         "intent": runtime_dir / f"{prefix}.intent.md",
         "context": runtime_dir / f"{prefix}.context.json",
+        "references": runtime_dir / f"{prefix}.references.md",
         "scenes": runtime_dir / f"{prefix}.scenes.md",
         "rule_stack": runtime_dir / f"{prefix}.rule-stack.yaml",
         "trace": runtime_dir / f"{prefix}.trace.json",
@@ -664,6 +835,12 @@ def infer_project_dir_from_chapter(chapter_path: Path) -> Path | None:
     return None
 
 
+def sanitize_path_component(value: str) -> str:
+    cleaned = re.sub(r"[\\/:*?\"<>|\r\n\t]+", "-", value).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.rstrip(".") or "未命名"
+
+
 def find_chapter_file_by_number(project_dir: Path, chapter_num: int | None) -> Path | None:
     if chapter_num is None:
         return None
@@ -675,7 +852,38 @@ def find_chapter_file_by_number(project_dir: Path, chapter_num: int | None) -> P
     return None
 
 
-def build_chapter_intent(summary: dict, chapter_num: int, chapter_title: str | None, guidance: str, selected_sources: list[dict], project_dir: Path | None = None) -> str:
+def build_corpus_query_texts(summary: dict, chapter_title: str | None, guidance: str) -> list[str]:
+    query_texts: list[str] = []
+
+    def add(value: str | None) -> None:
+        normalized = first_meaningful_value(value)
+        if normalized and normalized not in query_texts:
+            query_texts.append(normalized)
+
+    add(chapter_title)
+    add(guidance)
+    add(summary.get("phase_goal"))
+    add(summary.get("next_goal"))
+    add(summary.get("protagonist_state"))
+
+    for row in summary.get("active_plots", [])[:3]:
+        cells = [cell.strip() for cell in str(row).split("|") if cell.strip()]
+        for cell in cells[:2]:
+            add(cell)
+
+    return query_texts
+
+
+def build_chapter_intent(
+    summary: dict,
+    chapter_num: int,
+    chapter_title: str | None,
+    guidance: str,
+    selected_sources: list[dict],
+    pattern_reference_bundle: dict[str, Any],
+    pattern_reference_path: Path | None,
+    project_dir: Path | None = None,
+) -> str:
     goal = first_meaningful_value(guidance, summary.get("phase_goal"), summary.get("next_goal")) or "推进当前主线"
 
     must_keep: list[str] = []
@@ -712,6 +920,23 @@ def build_chapter_intent(summary: dict, chapter_num: int, chapter_title: str | N
     if not source_lines:
         source_lines = ["- 暂无"]
 
+    pattern_matches = pattern_reference_bundle.get("matches", [])
+    pattern_keywords = pattern_reference_bundle.get("keywords", [])
+    pattern_types = pattern_reference_bundle.get("preferred_types", [])
+    if pattern_reference_path is not None:
+        pattern_lines = [
+            f"- 范本文件：{pattern_reference_path}",
+            f"- 查询词：{' / '.join(str(item) for item in pattern_keywords) if pattern_keywords else '未生成'}",
+            f"- 重点摘录类型：{' / '.join(str(item) for item in pattern_types) if pattern_types else '未设置'}",
+            f"- 命中数量：{len(pattern_matches)}",
+            "- 用法：优先借起势、对白张力和章末停点，不直接改写原句。",
+        ]
+    else:
+        pattern_lines = [
+            "- 未生成本地范本参考文件。",
+            "- 若已补充样本，先执行 `python3 scripts/build_corpus_assets.py`。",
+        ]
+
     must_keep_lines = [f"- {item}" for item in must_keep] or ["- 暂无"]
     must_avoid_lines = [f"- {item}" for item in must_avoid] or ["- 暂无"]
     conflict_lines = [f"- {item}" for item in conflicts] or ["- 暂无"]
@@ -745,6 +970,9 @@ def build_chapter_intent(summary: dict, chapter_num: int, chapter_title: str | N
         "",
         "## Inputs",
         *source_lines,
+        "",
+        "## Local Pattern References",
+        *pattern_lines,
         "",
     ]
 
@@ -987,12 +1215,25 @@ def materialize_plan(project_dir: Path, summary: dict, chapter_num: int, chapter
     paths = runtime_paths(project_dir, chapter_num)
     paths["runtime_dir"].mkdir(parents=True, exist_ok=True)
     selected_sources = build_runtime_sources(project_dir, summary, chapter_num, guidance)
-    intent_content = build_chapter_intent(summary, chapter_num, chapter_title, guidance, selected_sources, project_dir=project_dir)
+    pattern_reference_bundle = select_corpus_examples(build_corpus_query_texts(summary, chapter_title, guidance), limit=4)
+    paths["references"].write_text(render_reference_markdown(pattern_reference_bundle), encoding="utf-8")
+    intent_content = build_chapter_intent(
+        summary,
+        chapter_num,
+        chapter_title,
+        guidance,
+        selected_sources,
+        pattern_reference_bundle,
+        paths["references"],
+        project_dir=project_dir,
+    )
     paths["intent"].write_text(intent_content, encoding="utf-8")
     return {
         "chapter": chapter_num,
         "intent_path": str(paths["intent"]),
+        "references_path": str(paths["references"]),
         "goal": first_meaningful_value(guidance, summary.get("phase_goal"), summary.get("next_goal")) or "推进当前主线",
+        "pattern_references": pattern_reference_bundle,
         "selected_sources": selected_sources,
     }
 
@@ -1008,6 +1249,8 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
         "current_volume": summary.get("current_volume", "未记录"),
         "current_phase": summary.get("current_phase", "未记录"),
         "phase_goal": summary.get("phase_goal", "未记录"),
+        "patternReferencesPath": plan_result["references_path"],
+        "patternReferences": plan_result["pattern_references"]["matches"],
         "selectedContext": selected_sources,
     }
     trace_payload = {
@@ -1026,9 +1269,12 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
             "plot/时间线.md",
             "characters/*.md",
         ],
+        "patternReferenceKeywords": plan_result["pattern_references"]["keywords"],
+        "patternReferenceTypes": plan_result["pattern_references"]["preferred_types"],
         "selectedSources": [item["source"] for item in selected_sources],
         "notes": [
             "本章运行时产物由本地项目记忆编译生成，不依赖在线 LLM。",
+            "本地范本命中结果写入 references 文件，优先借结构，不直接抄句子。",
             "如果本章目标或上下文变化，应重新执行 plan / compose。",
         ],
     }
@@ -1042,10 +1288,12 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
         "chapter": chapter_num,
         "intent_path": str(paths["intent"]),
         "context_path": str(paths["context"]),
+        "references_path": str(paths["references"]),
         "scenes_path": str(paths["scenes"]),
         "rule_stack_path": str(paths["rule_stack"]),
         "trace_path": str(paths["trace"]),
         "goal": plan_result["goal"],
+        "pattern_references": plan_result["pattern_references"],
         "selected_sources": selected_sources,
     }
 
@@ -1120,8 +1368,25 @@ def print_named_list(title: str, items: list[str], empty_value: str = "无") -> 
         print(f"- {empty_value}")
 
 
-def evaluate_preflight(project_dir: Path) -> tuple[dict, list[str]]:
-    summary = summarize_project(project_dir)
+def print_gate_failures_or_json(
+    *,
+    json_mode: bool,
+    title: str,
+    failures: list[str],
+    payload: dict[str, Any] | None = None,
+) -> None:
+    if json_mode:
+        output = dict(payload or {})
+        output.setdefault("error", title)
+        output["failures"] = failures
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        return
+
+    print_gate_failures(title, failures)
+
+
+def evaluate_preflight(project_dir: Path, summary_overrides: dict[str, Any] | None = None) -> tuple[dict, list[str]]:
+    summary = apply_summary_overrides(summarize_project(project_dir), summary_overrides)
     chapter_count, _ = compute_manuscript_stats(project_dir)
 
     failures: list[str] = []
@@ -1594,6 +1859,7 @@ def build_review_report(chapter_path: Path, project_dir: Path | None = None) -> 
     return {
         "file": str(chapter_path),
         "project_dir": str(project_dir) if project_dir else consistency_report.get("project_dir"),
+        "report_file": None,
         "review_mode": "static_precheck_plus_dossier",
         "verdict": verdict,
         "blocking_issues": blocking_issues,
@@ -1612,6 +1878,180 @@ def build_review_report(chapter_path: Path, project_dir: Path | None = None) -> 
     }
 
 
+def infer_review_volume_bucket(chapter_path: Path, project_dir: Path, consistency_report: dict[str, Any]) -> str | None:
+    current_volume = first_meaningful_value(consistency_report["expected"].get("current_volume"))
+    if current_volume:
+        return current_volume
+
+    manuscript_dir = project_dir / "manuscript"
+    try:
+        relative = chapter_path.relative_to(manuscript_dir)
+    except ValueError:
+        return None
+
+    if len(relative.parts) > 1:
+        return relative.parts[0]
+    return None
+
+
+def derive_review_report_path(
+    chapter_path: Path,
+    project_dir: Path | None,
+    consistency_report: dict[str, Any],
+    explicit_path: Path | None = None,
+) -> Path | None:
+    if explicit_path is not None:
+        return explicit_path
+
+    if project_dir is None:
+        return None
+
+    chapter_num = parse_chapter_number_from_path(chapter_path)
+    chapter_label = f"第{chapter_num:04d}章" if chapter_num is not None else sanitize_path_component(chapter_path.stem)
+    volume_bucket = infer_review_volume_bucket(chapter_path, project_dir, consistency_report)
+
+    report_dir = project_dir / "审阅意见"
+    filename_parts = ["章节审阅报告"]
+    if volume_bucket:
+        safe_volume = sanitize_path_component(volume_bucket)
+        report_dir = report_dir / safe_volume
+        filename_parts.append(safe_volume)
+    filename_parts.extend([chapter_label, date.today().isoformat()])
+    return report_dir / ("_".join(filename_parts) + ".md")
+
+
+def render_review_report_markdown(report: dict[str, Any]) -> str:
+    metrics = report["metrics"]
+    wordcount = metrics["wordcount"]
+    emotion = metrics["emotion"]
+    thrills = metrics["thrills"]
+    dialogue = metrics["dialogue"]
+    dossier = report["dossier"]
+    consistency = report["consistency"]
+
+    def section(title: str, items: list[str], empty_value: str = "- 暂无") -> list[str]:
+        lines = [f"## {title}", ""]
+        if items:
+            lines.extend(f"- {item}" for item in items)
+        else:
+            lines.append(empty_value)
+        lines.append("")
+        return lines
+
+    lines = [
+        "# 章节审阅报告",
+        "",
+        f"- 章节文件：`{report['file']}`",
+        f"- 审稿模式：`{report.get('review_mode', 'unknown')}`",
+        f"- 静态预审 Verdict：`{report['verdict']}`",
+        f"- 项目目录：`{report.get('project_dir') or '未定位'}`",
+        f"- 生成日期：`{date.today().isoformat()}`",
+        "",
+        "## 静态预审摘要",
+        "",
+        f"- 字数：{wordcount.get('word_count', 0)}（{wordcount.get('status', 'unknown')}）",
+        f"- 情绪走向：{emotion.get('transition', 'unknown')}",
+        f"- 爽点/毒点：thrill={thrills.get('thrill_score', 0)}, poison={thrills.get('poison_score', 0)}, overall={thrills.get('overall', 'unknown')}",
+        f"- 对白统计：lines={dialogue['dialogue_lines']}, chars={dialogue['dialogue_chars']}, avg={dialogue['avg_chars_per_line']}",
+        f"- 语义审稿完成：{dossier['semantic_review_complete']}",
+        f"- 语义审稿要求：{dossier['semantic_review_requires']}",
+        "",
+    ]
+
+    lines.extend(section("阻塞问题", report.get("blocking_issues", [])))
+    lines.extend(section("风险提示", report.get("warnings", [])))
+
+    lines += [
+        "## 连贯性上下文",
+        "",
+        f"- 上一章：`{consistency.get('previous_chapter') or '未定位'}`",
+        f"- 下一章：`{consistency.get('next_chapter') or '未定位'}`",
+        f"- 预期 POV：{consistency['expected']['viewpoint']}",
+        f"- 当前卷：{consistency['expected']['current_volume']}",
+        f"- 当前阶段：{consistency['expected']['current_phase']}",
+        f"- 当前阶段目标：{consistency['expected']['phase_goal']}",
+        f"- 下一章目标：{consistency['expected']['next_goal']}",
+        "",
+    ]
+
+    if report["lint_findings"]:
+        lines += ["## 规则命中详情", ""]
+        for item in report["lint_findings"]:
+            lines.append(f"### {item['name']} [{item['severity']}]")
+            lines.append("")
+            lines.append(f"- 提示：{item['message']}")
+            if item.get("hits"):
+                lines.extend(
+                    f"- 命中：{hit.get('keyword') or hit.get('pattern') or 'match'} x{hit['count']}"
+                    for hit in item["hits"][:5]
+                )
+            if item.get("evidence"):
+                lines.extend(
+                    f"- 证据：{evidence['label']}"
+                    + (f" line={evidence['line']}" if evidence.get("line") else "")
+                    + f" | {evidence['excerpt']}"
+                    for evidence in item["evidence"][:3]
+                )
+            lines.append("")
+
+    if report["dialogue_findings"]:
+        lines += ["## 对白专审命中", ""]
+        for item in report["dialogue_findings"]:
+            lines.append(f"- {item['name']} [{item['severity']}]：{item['message']}")
+        lines.append("")
+
+    lines += ["## 自动预审检查", ""]
+    for item in dossier["auto_checks"]:
+        lines.append(f"### {item['title']} [{item['status']}]")
+        lines.append("")
+        lines.append(f"- 判断：{item['reason']}")
+        for evidence in item.get("evidence", [])[:2]:
+            lines.append(f"- 证据：{evidence}")
+        for signal in item.get("signals", [])[:4]:
+            lines.append(f"- 信号：{signal}")
+        lines.append("")
+
+    lines += ["## 待完成语义审稿问题", ""]
+    for item in dossier["semantic_questions"]:
+        lines.append(f"### {item['question']}")
+        lines.append("")
+        lines.append(f"- 为什么看：{item['why']}")
+        for evidence in item.get("evidence", [])[:4]:
+            if evidence:
+                lines.append(f"- 证据：{evidence}")
+        lines.append("")
+
+    lines.extend(section("建议下一轮动作", report.get("actions", [])))
+    lines += [
+        "## 返修参考",
+        "",
+        "- `references/anti-ai-rewrite.md`：去 AI 味返修的三档强度、四类病灶和保钩子规则。",
+        "- `references/review-reporting.md`：审阅报告目录、命名和落盘约定。",
+        "",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_review_report_file(
+    report: dict[str, Any],
+    chapter_path: Path,
+    project_dir: Path | None,
+    explicit_path: Path | None = None,
+) -> Path | None:
+    report_path = derive_review_report_path(
+        chapter_path,
+        project_dir=project_dir,
+        consistency_report=report["consistency"],
+        explicit_path=explicit_path,
+    )
+    if report_path is None:
+        return None
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(render_review_report_markdown(report), encoding="utf-8")
+    return report_path
+
+
 def print_review_summary(report: dict[str, Any]) -> None:
     metrics = report["metrics"]
     wordcount = metrics["wordcount"]
@@ -1627,6 +2067,8 @@ def print_review_summary(report: dict[str, Any]) -> None:
     print(f"- 语义审稿完成: {report['dossier']['semantic_review_complete']}")
     print(f"- 审稿要求: {report['dossier']['semantic_review_requires']}")
     print(f"- 项目目录: {report.get('project_dir') or '未定位'}")
+    if report.get("report_file"):
+        print(f"- 审阅报告: {report['report_file']}")
     print(f"- 字数: {wordcount.get('word_count', 0)} ({wordcount.get('status', 'unknown')})")
     print(f"- 情绪走向: {emotion.get('transition', 'unknown')}")
     print(
@@ -1688,6 +2130,104 @@ def read_extra_texts(inline_values: list[str] | None, file_values: list[str] | N
     return texts
 
 
+def resolve_platform_profile(platform: str | None) -> tuple[str | None, dict[str, Any] | None]:
+    if not platform:
+        return None, None
+    normalized = platform.strip().lower()
+    partial_matches: list[tuple[str, dict[str, Any]]] = []
+
+    for canonical, profile in PLATFORM_GATE_PROFILES.items():
+        aliases = [canonical, *profile.get("aliases", [])]
+        lowered = [alias.lower() for alias in aliases]
+        if normalized in lowered:
+            return canonical, profile
+        if any(normalized in alias or alias in normalized for alias in lowered):
+            partial_matches.append((canonical, profile))
+
+    if partial_matches:
+        return partial_matches[0]
+    return None, None
+
+
+def format_word_range(word_range: tuple[int, int] | None) -> str:
+    if not word_range:
+        return "未设置"
+    return f"{word_range[0]}-{word_range[1]} 字"
+
+
+def build_platform_gate_markdown_lines(canonical_platform: str, profile: dict[str, Any]) -> list[str]:
+    word_range = format_word_range(profile.get("chapter_word_range"))
+    opening_min = profile.get("opening_hook_min_signals", 1)
+    ending_min = profile.get("ending_hook_min_signals", 1)
+    dialogue_max = profile.get("dialogue_avg_max", "未设置")
+
+    lines = [
+        "## 平台输出门禁",
+        f"- 平台：{canonical_platform}",
+        f"- 输出形态：{profile.get('output_mode', '未设置')}",
+        f"- 推荐单章字数：{word_range}",
+        f"- 开头门槛：前三段至少 {opening_min} 个可见钩子信号",
+        f"- 结尾门槛：结尾至少 {ending_min} 个未决动作 / 危险 / 发现信号",
+        f"- 对白负载：平均每句尽量不高于 {dialogue_max} 字",
+        "",
+        "## 平台重点",
+        *[f"- {item}" for item in profile.get("brief_focus", [])],
+        "",
+        "## 平台禁行项",
+        *[f"- {item}" for item in profile.get("brief_avoid", [])],
+        "",
+    ]
+    return lines
+
+
+def extract_markdown_headings(text: str, level: int = 2) -> list[str]:
+    pattern = rf"(?m)^{'#' * level}\s+(.+?)\s*$"
+    return [item.strip() for item in re.findall(pattern, text)]
+
+
+def extract_markdown_sections(text: str, level: int = 2) -> dict[str, str]:
+    heading_prefix = "#" * level + " "
+    sections: dict[str, str] = {}
+    current_heading: str | None = None
+    current_lines: list[str] = []
+
+    for raw_line in text.splitlines():
+        if raw_line.startswith(heading_prefix):
+            if current_heading is not None:
+                sections[current_heading] = "\n".join(current_lines).strip()
+            current_heading = raw_line[len(heading_prefix) :].strip()
+            current_lines = []
+            continue
+        if current_heading is not None:
+            current_lines.append(raw_line)
+
+    if current_heading is not None:
+        sections[current_heading] = "\n".join(current_lines).strip()
+    return sections
+
+
+def marketing_line_has_substance(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped.startswith("-"):
+        stripped = stripped[1:].strip()
+    if not stripped:
+        return False
+    if any(signal in stripped.lower() for signal in MARKETING_PLACEHOLDER_SIGNALS):
+        return False
+    if re.fullmatch(r".+[:：]\s*", stripped):
+        return False
+    return True
+
+
+def marketing_section_has_substance(text: str) -> bool:
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return False
+    return any(marketing_line_has_substance(line) for line in lines)
+
+
 def build_marketing_brief(
     project_dir: Path,
     summary: dict[str, Any],
@@ -1702,6 +2242,8 @@ def build_marketing_brief(
     current_focus = read_text(project_dir / "docs" / "当前焦点.md")
     project_outline = read_text(resolve_project_outline_path(project_dir) or project_dir / PROJECT_OUTLINE_PATH)
     chapter_plan = read_text(resolve_chapter_plan_path(project_dir) or project_dir / CHAPTER_PLAN_PATH)
+    canonical_platform, platform_profile = resolve_platform_profile(platform)
+    display_platform = canonical_platform or platform or "未指定"
 
     long_goal_lines = extract_section_lines(author_intent, "长期目标")
     platform_lines = extract_section_lines(author_intent, "平台与商业约束")
@@ -1738,7 +2280,7 @@ def build_marketing_brief(
         "## 项目定位",
         f"- 书名：{summary['book_title']}",
         f"- 创作阶段：{summary['stage']}",
-        f"- 目标平台：{platform or '未指定'}",
+        f"- 目标平台：{display_platform}",
         f"- 目标读者：{audience or '未指定'}",
         f"- 当前商业角度：{angle or '未指定'}",
         "",
@@ -1748,6 +2290,18 @@ def build_marketing_brief(
         "## 平台与商业约束",
         *(platform_lines or ["- 未从 docs/作者意图.md 读取到平台约束"]),
         "",
+    ]
+
+    if platform_profile and canonical_platform:
+        brief_lines.extend(build_platform_gate_markdown_lines(canonical_platform, platform_profile))
+    elif platform:
+        brief_lines.extend([
+            "## 平台输出门禁",
+            f"- 当前平台 `{platform}` 未内置专门门禁，先按 docs/作者意图.md 的平台与商业约束执行。",
+            "",
+        ])
+
+    brief_lines.extend([
         "## 近期宣传焦点",
         *(focus_lines or ["- 未从 docs/当前焦点.md 读取到近期焦点"]),
         "",
@@ -1775,14 +2329,19 @@ def build_marketing_brief(
         "## 章节规划摘录",
         chapter_plan_excerpt,
         "",
-    ]
+    ])
 
     return {
         "project_dir": str(project_dir),
         "book_title": summary["book_title"],
-        "platform": platform or "未指定",
+        "platform": display_platform,
         "audience": audience or "未指定",
         "angle": angle or "未指定",
+        "platform_gate": {
+            "canonical_platform": canonical_platform,
+            "matched": platform_profile is not None,
+            "profile": platform_profile,
+        },
         "prompt_lines": compiled_prompt_lines,
         "brief_markdown": "\n".join(brief_lines),
     }
@@ -1867,8 +2426,33 @@ def handle_consistency(args: argparse.Namespace) -> int:
 
 def handle_review(args: argparse.Namespace) -> int:
     chapter_path = Path(args.chapter_path).expanduser().resolve()
-    project_dir = Path(args.project_path).expanduser().resolve() if getattr(args, "project_path", None) else None
+    if not is_chapter_file(chapter_path):
+        failures = [
+            f"只支持章节文件，当前输入不是章节：{chapter_path.name}",
+            "文件名需符合章节命名，例如 `0001_标题.md` 或 `第1章_标题.md`",
+        ]
+        print_gate_failures_or_json(
+            json_mode=bool(getattr(args, "json", False)),
+            title="review 输入不合法",
+            failures=failures,
+            payload={"file": str(chapter_path)},
+        )
+        return 2
+
+    project_dir = Path(args.project_path).expanduser().resolve() if getattr(args, "project_path", None) else infer_project_dir_from_chapter(chapter_path)
     report = build_review_report(chapter_path, project_dir=project_dir)
+    report_path_arg = getattr(args, "report_path", None)
+    explicit_report_path = Path(report_path_arg).expanduser().resolve() if report_path_arg else None
+
+    if not getattr(args, "no_write_report", False):
+        report_path = write_review_report_file(
+            report,
+            chapter_path=chapter_path,
+            project_dir=project_dir,
+            explicit_path=explicit_report_path,
+        )
+        if report_path is not None:
+            report["report_file"] = str(report_path)
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -1878,17 +2462,65 @@ def handle_review(args: argparse.Namespace) -> int:
     return 0 if report["verdict"] == "pass" else 2 if report["blocking_issues"] else 1
 
 
+def collect_start_failures(args: argparse.Namespace, project_dir: Path, summary: dict[str, Any]) -> list[str]:
+    target_label = f"第{args.chapter_num}章"
+    current_chapter_num = parse_chapter_number_from_text(summary["current_chapter"])
+    effective_next_goal = args.next_goal or summary["next_goal"]
+    effective_current_volume = args.current_volume or summary["current_volume"]
+    effective_current_phase = args.current_phase or summary["current_phase"]
+
+    failures: list[str] = []
+    if summary["missing_files"]:
+        failures.append("缺失项目记忆文件，先修记忆，再标记章节进行中")
+    if requires_longform_governance(project_dir, summary) and summary["missing_longform_files"]:
+        failures.append("缺失超长篇治理文件，先执行 bootstrap-longform")
+    if effective_next_goal in {"未记录", "无", ""}:
+        failures.append("未记录下一章目标，start 前必须先补 task_log.md 或传入 --next-goal")
+    if current_chapter_num not in {None, args.chapter_num} and summary["current_chapter"] != "无":
+        failures.append(f"当前已有进行中章节：{summary['current_chapter']}，不要并发开写多个章节")
+    if requires_longform_governance(project_dir, summary) and effective_current_volume in {"未记录", "未开始", "无", ""}:
+        failures.append("start 前必须先明确当前卷")
+    if requires_longform_governance(project_dir, summary) and effective_current_phase in {"未记录", "未开始", "无", ""}:
+        failures.append("start 前必须先明确当前阶段")
+    return failures
+
+
+def collect_finish_failures(
+    args: argparse.Namespace,
+    project_dir: Path,
+    summary: dict[str, Any],
+    chapter_path: Path,
+) -> list[str]:
+    target_label = f"第{args.chapter_num}章"
+    current_chapter_num = parse_chapter_number_from_text(summary["current_chapter"])
+
+    failures: list[str] = []
+    if summary["missing_files"]:
+        failures.append("缺失项目记忆文件，finish 前必须先恢复项目记忆")
+    if requires_longform_governance(project_dir, summary) and summary["missing_longform_files"]:
+        failures.append("缺失超长篇治理文件，finish 前必须先补齐")
+    if current_chapter_num != args.chapter_num:
+        failures.append(f"当前处理章节不是 {target_label}，请先执行 start 并保持章节状态一致")
+    if not chapter_path.exists():
+        failures.append(f"章节文件不存在：{chapter_path}")
+    if not args.summary:
+        failures.append("finish 必须提供 --summary，用于同步章节摘要和项目记忆")
+    return failures
+
+
 def handle_next_chapter(args: argparse.Namespace) -> int:
     project_dir = Path(args.project_path).expanduser().resolve()
-    summary, failures = evaluate_preflight(project_dir)
+    summary, failures = evaluate_preflight(project_dir, summary_overrides=collect_summary_overrides(args))
     chapter_num = determine_target_chapter_num(project_dir, summary, explicit=args.chapter_num)
     guidance = read_guidance(args)
+    json_mode = bool(getattr(args, "json", False))
 
-    if args.json and failures:
+    if json_mode and failures:
         print(json.dumps({"project_dir": str(project_dir), "chapter": chapter_num, "failures": failures}, ensure_ascii=False, indent=2))
         return 2
 
-    print_resume_summary(summary)
+    if not json_mode:
+        print_resume_summary(summary)
     if failures:
         print_gate_failures("前置校验失败: next-chapter 未通过", failures)
         return 2
@@ -1914,15 +2546,54 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
         pending_setting_sync=args.pending_setting_sync,
         plot_note=args.plot_note,
     )
-    start_code = handle_start(start_args)
-    if start_code != 0:
-        return start_code
+    start_summary = apply_summary_overrides(summarize_project(project_dir), collect_summary_overrides(start_args))
+    start_failures = collect_start_failures(start_args, project_dir, start_summary)
+    if start_failures:
+        print_gate_failures_or_json(
+            json_mode=json_mode,
+            title="前置校验失败: start 未通过",
+            failures=start_failures,
+            payload={"project_dir": str(project_dir), "chapter": chapter_num, "stage": "start"},
+        )
+        return 2
+
+    if json_mode:
+        update_progress(
+            project_path=start_args.project_path,
+            chapter_num=start_args.chapter_num,
+            chapter_title=start_args.chapter_title,
+            core_event=start_args.core_event,
+            hook=start_args.hook,
+            next_goal=start_args.next_goal,
+            viewpoint=start_args.viewpoint,
+            protagonist_location=start_args.protagonist_location,
+            protagonist_state=start_args.protagonist_state,
+            stage=start_args.stage,
+            target_total_words=start_args.target_total_words,
+            target_volumes=start_args.target_volumes,
+            current_volume=start_args.current_volume,
+            current_phase=start_args.current_phase,
+            phase_goal=start_args.phase_goal,
+            pending_setting_sync=start_args.pending_setting_sync,
+            plot_note=start_args.plot_note,
+            status=STATUS_IN_PROGRESS,
+            silent=True,
+        )
+    else:
+        start_code = handle_start(start_args)
+        if start_code != 0:
+            return start_code
 
     finished = False
     review_report: dict[str, Any] | None = None
     if args.chapter_path or args.summary:
         if not args.chapter_path or not args.summary:
-            print_gate_failures("next-chapter finish 参数不完整", ["执行 finish 时必须同时提供 --chapter-path 与 --summary"])
+            print_gate_failures_or_json(
+                json_mode=json_mode,
+                title="next-chapter finish 参数不完整",
+                failures=["执行 finish 时必须同时提供 --chapter-path 与 --summary"],
+                payload={"project_dir": str(project_dir), "chapter": chapter_num, "stage": "finish"},
+            )
             return 2
         finish_args = argparse.Namespace(
             project_path=str(project_dir),
@@ -1947,11 +2618,57 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
             word_count=args.word_count,
             skip_checks=args.skip_checks,
         )
-        finish_code = handle_finish(finish_args)
-        if finish_code != 0:
-            return finish_code
+        chapter_path = Path(finish_args.chapter_path).expanduser().resolve()
+        finish_summary = summarize_project(project_dir)
+        finish_failures = collect_finish_failures(finish_args, project_dir, finish_summary, chapter_path)
+        if finish_failures:
+            print_gate_failures_or_json(
+                json_mode=json_mode,
+                title="前置校验失败: finish 未通过",
+                failures=finish_failures,
+                payload={"project_dir": str(project_dir), "chapter": chapter_num, "stage": "finish"},
+            )
+            return 2
+
+        if json_mode:
+            report = None
+            if not finish_args.skip_checks:
+                report = build_check_report(chapter_path)
+
+            word_count = finish_args.word_count
+            if word_count is None:
+                result = report["wordcount"] if report else check_chapter(str(chapter_path))
+                word_count = result.get("word_count")
+
+            update_progress(
+                project_path=finish_args.project_path,
+                chapter_num=finish_args.chapter_num,
+                word_count=word_count,
+                chapter_title=finish_args.chapter_title,
+                summary=finish_args.summary,
+                core_event=finish_args.core_event,
+                hook=finish_args.hook,
+                next_goal=finish_args.next_goal,
+                viewpoint=finish_args.viewpoint,
+                protagonist_location=finish_args.protagonist_location,
+                protagonist_state=finish_args.protagonist_state,
+                stage=finish_args.stage,
+                target_total_words=finish_args.target_total_words,
+                target_volumes=finish_args.target_volumes,
+                current_volume=finish_args.current_volume,
+                current_phase=finish_args.current_phase,
+                phase_goal=finish_args.phase_goal,
+                pending_setting_sync=finish_args.pending_setting_sync,
+                plot_note=finish_args.plot_note,
+                status=STATUS_DONE,
+                silent=True,
+            )
+        else:
+            finish_code = handle_finish(finish_args)
+            if finish_code != 0:
+                return finish_code
         finished = True
-        review_report = build_review_report(Path(args.chapter_path).expanduser().resolve(), project_dir=project_dir)
+        review_report = build_review_report(chapter_path, project_dir=project_dir)
 
     result = {
         "project_dir": str(project_dir),
@@ -1962,7 +2679,7 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
         "review_verdict": review_report["verdict"] if review_report else None,
     }
 
-    if args.json:
+    if json_mode:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
@@ -1972,6 +2689,8 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
     print(f"- 章节: 第{chapter_num}章")
     print(f"- 已执行: preflight -> resume -> plan -> compose -> start")
     print(f"- 意图文件: {runtime_result['intent_path']}")
+    print(f"- 范本文件: {runtime_result['references_path']}")
+    print(f"- 范本命中: {len(runtime_result['pattern_references']['matches'])}")
     print(f"- 场景卡文件: {runtime_result['scenes_path']}")
     if finished:
         print("- 已执行: finish")
@@ -2009,6 +2728,385 @@ def handle_marketing(args: argparse.Namespace) -> int:
     print(brief["brief_markdown"])
     if args.output_file:
         print(f"输出文件: {Path(args.output_file).expanduser().resolve()}")
+    return 0
+
+
+def evaluate_platform_gate_verdict(checks: list[dict[str, Any]]) -> str:
+    statuses = [item.get("status") for item in checks]
+    if "fail" in statuses:
+        return "fail"
+    if "warn" in statuses:
+        return "warn"
+    return "pass"
+
+
+def build_platform_chapter_gate_report(
+    input_path: Path,
+    canonical_platform: str,
+    profile: dict[str, Any],
+    project_dir: Path | None = None,
+) -> dict[str, Any]:
+    text = read_text(input_path)
+    if not text:
+        return {
+            "input": str(input_path),
+            "platform": canonical_platform,
+            "kind": "chapter",
+            "verdict": "fail",
+            "checks": [{"id": "missing_file", "title": "输入文件", "status": "fail", "reason": "文件不存在或为空", "evidence": []}],
+            "actions": ["先提供可读的章节文件，再执行平台门禁。"],
+            "platform_focus": profile.get("brief_focus", []),
+            "platform_avoid": profile.get("brief_avoid", []),
+        }
+
+    check_report = build_check_report(input_path, rule_project_dir=project_dir)
+    lint_findings = check_report.get("lint", [])
+    paragraphs = split_paragraph_units(text)
+    opening_excerpt = join_units_text(paragraphs[: min(3, len(paragraphs))])
+    ending_excerpt = join_units_text(paragraphs[-min(2, len(paragraphs)):])
+    opening_matches = collect_signal_matches(opening_excerpt, OPENING_HOOK_PATTERNS)
+    ending_matches = collect_signal_matches(ending_excerpt, ENDING_HOOK_PATTERNS)
+    ending_summary_hit = any(item.get("id") == "ending_summary" for item in lint_findings)
+    dialogue_stats = extract_dialogue_stats(text)
+    word_range = profile.get("chapter_word_range")
+    min_words, max_words = word_range if word_range else (0, 10**9)
+    word_count = check_report["wordcount"].get("word_count", 0)
+    ai_like_ids = {"ai_tells", "explanation_tone", "abstract_psychology", "dialogue_exposition", "transition_overexplained"}
+    ai_like_hits = [item for item in lint_findings if item.get("id") in ai_like_ids]
+    pov_hits = [item for item in lint_findings if item.get("id") == "pov_leak"]
+
+    checks = [
+        {
+            "id": "wordcount",
+            "title": "单章字数",
+            "status": "fail" if word_count < min_words else "warn" if word_count > max_words else "pass",
+            "reason": (
+                f"字数低于 {min_words} 字下限。"
+                if word_count < min_words
+                else f"字数高于 {max_words} 字建议上限，检查是否拖慢节奏。"
+                if word_count > max_words
+                else f"字数落在建议区间 {min_words}-{max_words} 字。"
+            ),
+            "evidence": [f"当前字数={word_count}"],
+        },
+        {
+            "id": "opening_hook",
+            "title": "开头钩子",
+            "status": "pass" if len(opening_matches) >= profile.get("opening_hook_min_signals", 1) else "warn",
+            "reason": (
+                f"前三段检测到 {len(opening_matches)} 个可见钩子信号。"
+                if len(opening_matches) >= profile.get("opening_hook_min_signals", 1)
+                else "开头前台信号不足，平台抓读力偏弱。"
+            ),
+            "evidence": [excerpt_text(opening_excerpt, max_chars=220)],
+            "signals": opening_matches,
+        },
+        {
+            "id": "ending_hook",
+            "title": "结尾钩子",
+            "status": "warn" if ending_summary_hit or len(ending_matches) < profile.get("ending_hook_min_signals", 1) else "pass",
+            "reason": (
+                "结尾命中总结/升华倾向。"
+                if ending_summary_hit
+                else f"结尾保留了 {len(ending_matches)} 个未决信号。"
+                if len(ending_matches) >= profile.get("ending_hook_min_signals", 1)
+                else "结尾缺少足够明确的未决动作、危险或发现。"
+            ),
+            "evidence": [excerpt_text(ending_excerpt, max_chars=220)],
+            "signals": ending_matches,
+        },
+        {
+            "id": "dialogue_load",
+            "title": "对白负载",
+            "status": "warn" if dialogue_stats["avg_chars_per_line"] > profile.get("dialogue_avg_max", 999) else "pass",
+            "reason": (
+                f"平均对白长度 {dialogue_stats['avg_chars_per_line']} 字，超过平台建议上限。"
+                if dialogue_stats["avg_chars_per_line"] > profile.get("dialogue_avg_max", 999)
+                else "对白长度未见明显平台风险。"
+            ),
+            "evidence": [f"对白行数={dialogue_stats['dialogue_lines']}, 平均句长={dialogue_stats['avg_chars_per_line']}"],
+        },
+        {
+            "id": "ai_density",
+            "title": "AI 痕迹密度",
+            "status": "warn" if ai_like_hits else "pass",
+            "reason": "命中解释腔 / 抽象心理 / AI 套语等静态信号。" if ai_like_hits else "静态规则未见明显 AI 痕迹聚集。",
+            "evidence": [item["name"] for item in ai_like_hits[:4]] or ["无"],
+        },
+        {
+            "id": "pov_boundary",
+            "title": "POV 边界",
+            "status": "warn" if pov_hits else "pass",
+            "reason": "命中可能的 POV 越权信号。" if pov_hits else "静态规则未见明显 POV 越权信号。",
+            "evidence": [item["name"] for item in pov_hits[:3]] or ["无"],
+        },
+    ]
+
+    actions: list[str] = []
+    for check in checks:
+        if check["id"] == "wordcount" and check["status"] == "fail":
+            actions.append("先补足章节体量，不要靠总结句和解释段注水。")
+        elif check["id"] == "wordcount" and check["status"] == "warn":
+            actions.append("检查是否存在拖节奏段落，优先压缩说明段和重复反应。")
+        elif check["id"] == "opening_hook" and check["status"] == "warn":
+            actions.append("把冲突、异常信息或高吸引力动作提前到前三段。")
+        elif check["id"] == "ending_hook" and check["status"] == "warn":
+            actions.append("删掉结尾总结，改停在动作、危险、发现或未决选择上。")
+        elif check["id"] == "dialogue_load" and check["status"] == "warn":
+            actions.append("把部分对白说明感转移到动作、环境和关系压力里。")
+        elif check["id"] == "ai_density" and check["status"] == "warn":
+            actions.append("按 `references/anti-ai-rewrite.md` 做轻到中档去味返修。")
+        elif check["id"] == "pov_boundary" and check["status"] == "warn":
+            actions.append("逐段确认信息是否仍贴紧当前 POV，删掉越权宣布。")
+
+    if not actions:
+        actions.append("平台门禁未见明显硬伤，进入人工平台适配润色即可。")
+
+    return {
+        "input": str(input_path),
+        "platform": canonical_platform,
+        "kind": "chapter",
+        "verdict": evaluate_platform_gate_verdict(checks),
+        "checks": checks,
+        "actions": actions[:6],
+        "platform_focus": profile.get("brief_focus", []),
+        "platform_avoid": profile.get("brief_avoid", []),
+    }
+
+
+def build_platform_marketing_gate_report(input_path: Path, canonical_platform: str, profile: dict[str, Any]) -> dict[str, Any]:
+    text = read_text(input_path)
+    if not text:
+        return {
+            "input": str(input_path),
+            "platform": canonical_platform,
+            "kind": "marketing",
+            "verdict": "fail",
+            "checks": [{"id": "missing_file", "title": "输入文件", "status": "fail", "reason": "文件不存在或为空", "evidence": []}],
+            "actions": ["先生成可读的营销 Brief，再执行平台门禁。"],
+            "platform_focus": profile.get("brief_focus", []),
+            "platform_avoid": profile.get("brief_avoid", []),
+        }
+
+    headings = extract_markdown_headings(text, level=2)
+    sections = extract_markdown_sections(text, level=2)
+    required_sections = [
+        "项目定位",
+        "长期卖点",
+        "平台与商业约束",
+        "近期宣传焦点",
+        "最近剧情抓手",
+        "活跃伏笔与钩子压力",
+        "可复用营销 Prompt",
+    ]
+    platform_sections = required_sections + ["平台输出门禁"]
+    missing_sections = [item for item in platform_sections if item not in headings]
+    placeholder_sections = [
+        item for item in required_sections if item in sections and not marketing_section_has_substance(sections[item])
+    ]
+
+    checks = [
+        {
+            "id": "required_sections",
+            "title": "核心 Section 完整度",
+            "status": "fail" if missing_sections else "pass",
+            "reason": "Brief 缺少关键 Section，平台包装信息不完整。" if missing_sections else "核心营销 Section 已齐备。",
+            "evidence": missing_sections or ["关键 Section 已覆盖"],
+        },
+        {
+            "id": "section_substance",
+            "title": "核心 Section 实质内容",
+            "status": "warn" if placeholder_sections else "pass",
+            "reason": "部分核心 Section 仍是占位框架或空内容。" if placeholder_sections else "核心 Section 已提供可用内容。",
+            "evidence": placeholder_sections or ["核心 Section 未见明显占位内容"],
+        },
+        {
+            "id": "brief_length",
+            "title": "Brief 体量",
+            "status": "warn" if len(text.strip()) < 500 else "pass",
+            "reason": "Brief 偏短，可能不足以支撑平台包装和后续改写。" if len(text.strip()) < 500 else "Brief 体量可供后续平台包装复用。",
+            "evidence": [f"字符数={len(text.strip())}"],
+        },
+        {
+            "id": "platform_mention",
+            "title": "平台指向",
+            "status": "warn" if canonical_platform not in text else "pass",
+            "reason": "Brief 中未明确出现目标平台名，后续改写容易跑偏。" if canonical_platform not in text else "Brief 已明确写出目标平台。",
+            "evidence": [canonical_platform],
+        },
+    ]
+
+    actions: list[str] = []
+    if missing_sections:
+        actions.append("先补齐缺失的核心 Section，再拿这份 Brief 继续做平台输出。")
+    if placeholder_sections:
+        actions.append("先把占位 Section 补成可执行内容，再把这份 Brief 当母稿使用。")
+    if len(text.strip()) < 500:
+        actions.append("补充最近剧情抓手、长期卖点和活跃伏笔，不要只留空框架。")
+    if canonical_platform not in text:
+        actions.append("在项目定位或平台输出门禁中明确写出目标平台。")
+    if not actions:
+        actions.append("这份 Brief 已可作为平台适配母稿，继续按平台重点做定向润色。")
+
+    return {
+        "input": str(input_path),
+        "platform": canonical_platform,
+        "kind": "marketing",
+        "verdict": evaluate_platform_gate_verdict(checks),
+        "checks": checks,
+        "actions": actions[:5],
+        "platform_focus": profile.get("brief_focus", []),
+        "platform_avoid": profile.get("brief_avoid", []),
+    }
+
+
+def render_platform_gate_report_markdown(report: dict[str, Any]) -> str:
+    lines = [
+        "# 平台输出门禁报告",
+        "",
+        f"- 输入文件：`{report['input']}`",
+        f"- 检查类型：`{report['kind']}`",
+        f"- 目标平台：`{report['platform']}`",
+        f"- Verdict：`{report['verdict']}`",
+        f"- 生成日期：`{date.today().isoformat()}`",
+        "",
+        "## 自动检查",
+        "",
+    ]
+
+    for item in report.get("checks", []):
+        lines.append(f"### {item['title']} [{item['status']}]")
+        lines.append("")
+        lines.append(f"- 判断：{item['reason']}")
+        for evidence in item.get("evidence", [])[:4]:
+            lines.append(f"- 证据：{evidence}")
+        for signal in item.get("signals", [])[:4]:
+            lines.append(f"- 信号：{signal}")
+        lines.append("")
+
+    lines += [
+        "## 平台重点",
+        "",
+        *([f"- {item}" for item in report.get("platform_focus", [])] or ["- 暂无"]),
+        "",
+        "## 平台禁行项",
+        "",
+        *([f"- {item}" for item in report.get("platform_avoid", [])] or ["- 暂无"]),
+        "",
+        "## 建议下一轮动作",
+        "",
+        *([f"- {item}" for item in report.get("actions", [])] or ["- 暂无"]),
+        "",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def print_platform_gate_summary(report: dict[str, Any]) -> None:
+    print("\n" + "=" * 60)
+    print(f"平台输出门禁: {Path(report['input']).name}")
+    print("=" * 60)
+    print(f"- 类型: {report['kind']}")
+    print(f"- 平台: {report['platform']}")
+    print(f"- Verdict: {report['verdict']}")
+
+    print("\n自动检查:")
+    for item in report.get("checks", []):
+        print(f"- {item['title']} [{item['status']}] {item['reason']}")
+        for evidence in item.get("evidence", [])[:2]:
+            print(f"  - {evidence}")
+
+    print_named_list("平台重点", report.get("platform_focus", []))
+    print_named_list("平台禁行项", report.get("platform_avoid", []))
+    print_named_list("建议下一轮动作", report.get("actions", []))
+
+
+def handle_platform_gate(args: argparse.Namespace) -> int:
+    input_path = Path(args.input_path).expanduser().resolve()
+    project_dir = Path(args.project_path).expanduser().resolve() if getattr(args, "project_path", None) else infer_project_dir_from_chapter(input_path)
+    canonical_platform, profile = resolve_platform_profile(args.platform)
+    if not profile or not canonical_platform:
+        payload = {
+            "error": f"未识别的平台：{args.platform}",
+            "supported_platforms": sorted(PLATFORM_GATE_PROFILES.keys()),
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 2
+
+    if args.kind == "marketing":
+        report = build_platform_marketing_gate_report(input_path, canonical_platform, profile)
+    else:
+        report = build_platform_chapter_gate_report(input_path, canonical_platform, profile, project_dir=project_dir)
+
+    if args.output_file:
+        output_path = Path(args.output_file).expanduser().resolve()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(render_platform_gate_report_markdown(report), encoding="utf-8")
+
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print_platform_gate_summary(report)
+        if args.output_file:
+            print(f"\n输出文件: {Path(args.output_file).expanduser().resolve()}")
+
+    return 0 if report["verdict"] == "pass" else 2 if report["verdict"] == "fail" else 1
+
+
+def handle_corpus_build(args: argparse.Namespace) -> int:
+    stats = build_corpus_assets()
+    if args.json:
+        print(json.dumps(stats, ensure_ascii=False, indent=2))
+        return 0
+
+    print("本地范本资产已构建")
+    print(f"- 文章数: {stats['articles']}")
+    print(f"- 摘录数: {stats['excerpts']}")
+    print(f"- 类型: {' / '.join(stats['types'])}")
+    return 0
+
+
+def handle_corpus_search(args: argparse.Namespace) -> int:
+    if args.list_tags:
+        print("可用标签:")
+        for tag in corpus_available_tags():
+            print(f"- {tag}")
+        return 0
+
+    if args.list_types:
+        print("可用摘录类型:")
+        for item in corpus_available_types():
+            print(f"- {item}")
+        return 0
+
+    results = search_corpus_examples(
+        tag=args.tag,
+        excerpt_type=args.type,
+        keyword=args.keyword,
+        limit=args.limit,
+    )
+    if not results:
+        print("未命中本地范本。")
+        print("- 先执行 corpus-build 确保索引存在")
+        print("- 再用 --list-tags / --list-types 检查覆盖范围")
+        return 0
+
+    for row in results:
+        if row["kind"] == "article":
+            print(f"[ARTICLE] {row['article_id']} 《{row['title']}》")
+            print(f"- 标签: {row['tags']}")
+            print(f"- 路径: {row['file_path']}")
+            print(f"- 摘要: {row['summary_le_200']}")
+            print(f"- 迁移提醒: {row['notes'] or '无'}")
+            print()
+            continue
+
+        print(f"[EXCERPT] {row['excerpt_id']} 《{row['title']}》")
+        print(f"- 类型: {row['excerpt_type']}")
+        print(f"- 标签: {row['tags']}")
+        print(f"- 路径: {row['file_path']}")
+        print(f"- 迁移提醒: {row['notes'] or '无'}")
+        print(row["text"])
+        print()
     return 0
 
 
@@ -2085,6 +3183,8 @@ def handle_plan(args: argparse.Namespace) -> int:
         print("=" * 60)
         print(f"章节: 第{chapter_num}章")
         print(f"意图文件: {result['intent_path']}")
+        print(f"范本文件: {result['references_path']}")
+        print(f"范本命中: {len(result['pattern_references']['matches'])}")
         print(f"目标: {result['goal']}")
     return 0
 
@@ -2106,6 +3206,8 @@ def handle_compose(args: argparse.Namespace) -> int:
         print(f"章节: 第{chapter_num}章")
         print(f"意图文件: {result['intent_path']}")
         print(f"上下文文件: {result['context_path']}")
+        print(f"范本文件: {result['references_path']}")
+        print(f"范本命中: {len(result['pattern_references']['matches'])}")
         print(f"场景卡文件: {result['scenes_path']}")
         print(f"规则栈文件: {result['rule_stack_path']}")
         print(f"轨迹文件: {result['trace_path']}")
@@ -2114,26 +3216,8 @@ def handle_compose(args: argparse.Namespace) -> int:
 
 def handle_start(args: argparse.Namespace) -> int:
     project_dir = Path(args.project_path).expanduser().resolve()
-    summary = summarize_project(project_dir)
-    target_label = f"第{args.chapter_num}章"
-    current_chapter_num = parse_chapter_number_from_text(summary["current_chapter"])
-    effective_next_goal = args.next_goal or summary["next_goal"]
-    effective_current_volume = args.current_volume or summary["current_volume"]
-    effective_current_phase = args.current_phase or summary["current_phase"]
-
-    failures: list[str] = []
-    if summary["missing_files"]:
-        failures.append("缺失项目记忆文件，先修记忆，再标记章节进行中")
-    if requires_longform_governance(project_dir, summary) and summary["missing_longform_files"]:
-        failures.append("缺失超长篇治理文件，先执行 bootstrap-longform")
-    if effective_next_goal in {"未记录", "无", ""}:
-        failures.append("未记录下一章目标，start 前必须先补 task_log.md 或传入 --next-goal")
-    if current_chapter_num not in {None, args.chapter_num} and summary["current_chapter"] != "无":
-        failures.append(f"当前已有进行中章节：{summary['current_chapter']}，不要并发开写多个章节")
-    if requires_longform_governance(project_dir, summary) and effective_current_volume in {"未记录", "未开始", "无", ""}:
-        failures.append("start 前必须先明确当前卷")
-    if requires_longform_governance(project_dir, summary) and effective_current_phase in {"未记录", "未开始", "无", ""}:
-        failures.append("start 前必须先明确当前阶段")
+    summary = apply_summary_overrides(summarize_project(project_dir), collect_summary_overrides(args))
+    failures = collect_start_failures(args, project_dir, summary)
 
     if failures:
         print_resume_summary(summary)
@@ -2158,6 +3242,7 @@ def handle_start(args: argparse.Namespace) -> int:
         phase_goal=args.phase_goal,
         pending_setting_sync=args.pending_setting_sync,
         status=STATUS_IN_PROGRESS,
+        silent=bool(getattr(args, "silent", False)),
     )
     return 0
 
@@ -2172,20 +3257,7 @@ def handle_finish(args: argparse.Namespace) -> int:
     project_dir = Path(args.project_path).expanduser().resolve()
     chapter_path = Path(args.chapter_path).expanduser().resolve()
     summary = summarize_project(project_dir)
-    target_label = f"第{args.chapter_num}章"
-    current_chapter_num = parse_chapter_number_from_text(summary["current_chapter"])
-
-    failures: list[str] = []
-    if summary["missing_files"]:
-        failures.append("缺失项目记忆文件，finish 前必须先恢复项目记忆")
-    if requires_longform_governance(project_dir, summary) and summary["missing_longform_files"]:
-        failures.append("缺失超长篇治理文件，finish 前必须先补齐")
-    if current_chapter_num != args.chapter_num:
-        failures.append(f"当前处理章节不是 {target_label}，请先执行 start 并保持章节状态一致")
-    if not chapter_path.exists():
-        failures.append(f"章节文件不存在：{chapter_path}")
-    if not args.summary:
-        failures.append("finish 必须提供 --summary，用于同步章节摘要和项目记忆")
+    failures = collect_finish_failures(args, project_dir, summary, chapter_path)
 
     if failures:
         print_resume_summary(summary)
@@ -2195,7 +3267,8 @@ def handle_finish(args: argparse.Namespace) -> int:
     report = None
     if not args.skip_checks:
         report = build_check_report(chapter_path)
-        print_check_summary(report)
+        if not getattr(args, "silent", False):
+            print_check_summary(report)
 
     word_count = args.word_count
     if word_count is None:
@@ -2223,6 +3296,7 @@ def handle_finish(args: argparse.Namespace) -> int:
         pending_setting_sync=args.pending_setting_sync,
         plot_note=args.plot_note,
         status=STATUS_DONE,
+        silent=bool(getattr(args, "silent", False)),
     )
     return 0
 
@@ -2345,6 +3419,19 @@ def build_parser() -> argparse.ArgumentParser:
     commands_parser.add_argument("--json", action="store_true", help="输出 JSON")
     commands_parser.set_defaults(handler=handle_commands)
 
+    corpus_build_parser = subparsers.add_parser("corpus-build", help="构建本地范本检索资产")
+    corpus_build_parser.add_argument("--json", action="store_true", help="输出 JSON")
+    corpus_build_parser.set_defaults(handler=handle_corpus_build)
+
+    corpus_search_parser = subparsers.add_parser("corpus-search", help="检索本地范本摘录")
+    corpus_search_parser.add_argument("--tag", help="按标签检索")
+    corpus_search_parser.add_argument("--type", help="按摘录类型检索")
+    corpus_search_parser.add_argument("--keyword", help="按关键词检索")
+    corpus_search_parser.add_argument("--limit", type=int, default=10, help="最多返回多少条，默认 10")
+    corpus_search_parser.add_argument("--list-tags", action="store_true", help="列出可用标签")
+    corpus_search_parser.add_argument("--list-types", action="store_true", help="列出可用摘录类型")
+    corpus_search_parser.set_defaults(handler=handle_corpus_search)
+
     init_parser = subparsers.add_parser("init", help="初始化小说项目")
     init_parser.add_argument("project_name", help="项目名称")
     init_parser.add_argument("--target-dir", help="项目创建目录，默认当前目录")
@@ -2425,6 +3512,8 @@ def build_parser() -> argparse.ArgumentParser:
     review_parser = subparsers.add_parser("review", help="生成静态预审 + 审稿稿本，不再冒充已完成语义审稿")
     review_parser.add_argument("chapter_path", help="章节文件路径")
     review_parser.add_argument("--project-path", help="项目根目录；不传则尝试自动定位")
+    review_parser.add_argument("--report-path", help="显式指定审阅报告输出路径；默认自动落到 <项目目录>/审阅意见/")
+    review_parser.add_argument("--no-write-report", action="store_true", help="只输出终端摘要，不落审阅报告文件")
     review_parser.add_argument("--json", action="store_true", help="输出 JSON")
     review_parser.set_defaults(handler=handle_review)
 
@@ -2467,6 +3556,15 @@ def build_parser() -> argparse.ArgumentParser:
     marketing_parser.add_argument("--output-file", help="将营销 Brief 写入文件")
     marketing_parser.add_argument("--json", action="store_true", help="输出 JSON")
     marketing_parser.set_defaults(handler=handle_marketing)
+
+    platform_gate_parser = subparsers.add_parser("platform-gate", help="按平台约束检查章节稿或营销 Brief")
+    platform_gate_parser.add_argument("input_path", help="待检查文件路径")
+    platform_gate_parser.add_argument("--platform", required=True, help="目标平台，例如 起点中文网 / 番茄小说网 / 知乎盐选")
+    platform_gate_parser.add_argument("--kind", choices=("chapter", "marketing"), default="chapter", help="检查类型")
+    platform_gate_parser.add_argument("--project-path", help="项目根目录；chapter 模式下不传则尝试自动定位")
+    platform_gate_parser.add_argument("--output-file", help="将门禁报告写入文件")
+    platform_gate_parser.add_argument("--json", action="store_true", help="输出 JSON")
+    platform_gate_parser.set_defaults(handler=handle_platform_gate)
 
     return parser
 

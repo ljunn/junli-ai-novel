@@ -31,6 +31,8 @@
 
 - `rules/novel-lint/*.yaml`
 
+`review` 默认还会把审稿稿本写进 `<项目目录>/审阅意见/`。相关落盘规则见 `references/review-reporting.md`；命中 AI 套语、解释腔、抽象心理时，返修可联动 `references/anti-ai-rewrite.md`。
+
 ## 规则字段
 
 每条规则至少包含：

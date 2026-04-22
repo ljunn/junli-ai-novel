@@ -30,7 +30,7 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 7. 读取 `docs/章节规划.md`
 8. 读取上一章正文
 9. 读取相关角色与设定
-10. 读取 `runtime/chapter-XXXX.intent.md`、`context.json`、`scenes.md`、`rule-stack.yaml`
+10. 读取 `runtime/chapter-XXXX.intent.md`、`runtime/chapter-XXXX.references.md`、`context.json`、`scenes.md`、`rule-stack.yaml`
 11. 检查活跃伏笔和时间线
 12. 将目标章节在 `docs/章节规划.md` 中标记为“进行中”，并执行 `start`
 
@@ -170,6 +170,7 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 - 文学感较强的网文开篇：`references/literary-opening.md`
 - 定向返修微操作：`references/micro-revision-ops.md`
 - 规则化文本检查：`references/rule-linting.md`
+- 去 AI 味返修：`references/anti-ai-rewrite.md`
 - 对白专审：`python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>`
 - 对话：`references/dialogue-writing.md`
 - 群像：`references/ensemble-writing.md`
@@ -186,6 +187,7 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 
 - `references/quality-checklist.md`
 - `references/consistency.md`
+- `references/review-reporting.md`
 
 最低检查项：
 
