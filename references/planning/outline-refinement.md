@@ -4,7 +4,7 @@
 
 默认定位：
 
-- 它是二次校验层，不替代 `references/main-plot-construction.md`
+- 它是二次校验层，不替代 `references/planning/main-plot-construction.md`
 - 顺序仍然是：主角目标 -> 起爆事件 -> 连锁反应 -> 逆推问题链 -> 大纲修整
 - 只有主线发动机先成立，这份文档才有意义
 
@@ -141,9 +141,9 @@
 
 默认做法：
 
-1. 先用 `references/main-plot-construction.md` 拎直主线
-2. 再用 `references/outline-template.md` 建立项目总纲，并用 `references/chapter-plan-template.md` 建立章节规划
+1. 先用 `references/planning/main-plot-construction.md` 拎直主线
+2. 再用 `references/planning/outline-template.md` 建立项目总纲，并用 `references/planning/chapter-plan-template.md` 建立章节规划
 3. 发现大纲空心、发散或扩写卡住时，再用这份文档回查
-4. 真正进入单章执行时，接 `references/chapter-workflow.md`
+4. 真正进入单章执行时，接 `references/chapter/chapter-workflow.md`
 
 不要反过来把这份文档抬到最前面。先有发动机，再谈修整手感。

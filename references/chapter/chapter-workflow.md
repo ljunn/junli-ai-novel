@@ -14,7 +14,7 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 
 只有当你需要拆解调试某一环时，才回到底层原子命令。
 
-如果项目目标进入超长篇范围，这份文件只负责“章内执行”，不负责卷级与阶段级治理。卷级与阶段级治理另看 `references/longform-governance.md`。
+如果项目目标进入超长篇范围，这份文件只负责“章内执行”，不负责卷级与阶段级治理。卷级与阶段级治理另看 `references/governance/longform-governance.md`。
 如果项目已启用输入治理，开写前先生成并阅读 `runtime/chapter-XXXX.intent.md`、`context.json`、`scenes.md`、`rule-stack.yaml`，再进入场景拆分。
 
 ## 1. 写前分析
@@ -117,11 +117,11 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 
 如果一场只能写出“发生了什么”，却写不出行动目的、明面冲突和关系/认知变化，这一场大概率还是流水场，先别急着扩正文。
 
-如果已经明确问题只出在局部段落，例如对白发虚、结尾无钩子、解释腔太重、关系变化不够，不要全文一起返工，优先改用 `references/micro-revision-ops.md` 里的单一微操作定向修。
+如果已经明确问题只出在局部段落，例如对白发虚、结尾无钩子、解释腔太重、关系变化不够，不要全文一起返工，优先改用 `references/quality/micro-revision-ops.md` 里的单一微操作定向修。
 
 ## 3. 正文撰写
 
-使用 `references/chapter-template.md` 作为正文约束，但不要把模板说明文字写进最终章节文件。
+使用 `references/chapter/chapter-template.md` 作为正文约束，但不要把模板说明文字写进最终章节文件。
 
 最终写入 `manuscript/` 时默认输出纯正文：
 
@@ -167,29 +167,29 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 
 按需读取以下资料：
 
-- 开头与章节结构：`references/chapter-guide.md`
-- 文学感较强的网文开篇：`references/literary-opening.md`
-- 定向返修微操作：`references/micro-revision-ops.md`
-- 规则化文本检查：`references/rule-linting.md`
-- 去 AI 味返修：`references/anti-ai-rewrite.md`
-- 分类写法 / 去悬浮：`references/descriptive-taxonomy.md`
+- 开头与章节结构：`references/chapter/chapter-guide.md`
+- 文学感较强的网文开篇：`references/chapter/literary-opening.md`
+- 定向返修微操作：`references/quality/micro-revision-ops.md`
+- 规则化文本检查：`references/quality/rule-linting.md`
+- 去 AI 味返修：`references/quality/anti-ai-rewrite.md`
+- 分类写法 / 去悬浮：`references/chapter/descriptive-taxonomy.md`
 - 对白专审：`python3 scripts/chapter_pipeline.py dialogue-pass <章节文件路径>`
-- 对话：`references/dialogue-writing.md`
-- 群像：`references/ensemble-writing.md`
-- 流断式节奏：`references/flow-break-writing.md`
-- 扩写：`references/content-expansion.md`
-- 日常叙事：`references/daily-narrative.md`
-- 钩子：`references/hook-techniques.md`
-- 连贯性：`references/consistency.md`
-- 非线性结构：`references/nonlinear-narrative.md`
+- 对话：`references/chapter/dialogue-writing.md`
+- 群像：`references/chapter/ensemble-writing.md`
+- 流断式节奏：`references/chapter/flow-break-writing.md`
+- 扩写：`references/chapter/content-expansion.md`
+- 日常叙事：`references/chapter/daily-narrative.md`
+- 钩子：`references/chapter/hook-techniques.md`
+- 连贯性：`references/quality/consistency.md`
+- 非线性结构：`references/chapter/nonlinear-narrative.md`
 
 ## 4. 写后检查
 
 默认检查入口：
 
-- `references/quality-checklist.md`
-- `references/consistency.md`
-- `references/review-reporting.md`
+- `references/quality/quality-checklist.md`
+- `references/quality/consistency.md`
+- `references/quality/review-reporting.md`
 
 最低检查项：
 

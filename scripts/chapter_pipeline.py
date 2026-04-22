@@ -93,6 +93,10 @@ MARKETING_PLACEHOLDER_SIGNALS = (
     "tbd",
 )
 
+REFERENCE_PATH_ALIASES = {
+    "writing-quickref.md": "chapter/writing-quickref.md",
+}
+
 RULE_LAYER_CATALOG: list[dict[str, Any]] = [
     {
         "id": "constitution",
@@ -119,14 +123,14 @@ RULE_LAYER_CATALOG: list[dict[str, Any]] = [
         "id": "novel-lint",
         "title": "规则化文本巡检",
         "kind": "rule-set",
-        "sources": ["rules/novel-lint/*.yaml", "references/rule-linting.md"],
+        "sources": ["rules/novel-lint/*.yaml", "references/quality/rule-linting.md"],
         "summary": "抓 AI 套语、结尾升华、视角越权、对白说明感、解释腔和转场过密。",
     },
     {
         "id": "consistency",
         "title": "连贯性检查清单",
         "kind": "checklist",
-        "sources": ["references/consistency.md", "references/quality-checklist.md"],
+        "sources": ["references/quality/consistency.md", "references/quality/quality-checklist.md"],
         "summary": "检查人物、伏笔、时间线、POV 边界和场景承接是否前后一致。",
     },
 ]
@@ -302,6 +306,27 @@ PLATFORM_GATE_PROFILES: dict[str, dict[str, Any]] = {
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def resolve_reference_file(filename: str, project_dir: Path | None = None) -> Path | None:
+    relative_candidates: list[str] = []
+    mapped = REFERENCE_PATH_ALIASES.get(filename)
+    if mapped:
+        relative_candidates.append(mapped)
+    relative_candidates.append(filename)
+
+    if project_dir is not None:
+        for relative in relative_candidates:
+            path = project_dir / "references" / relative
+            if path.exists():
+                return path
+
+    for relative in relative_candidates:
+        path = ROOT_DIR / "references" / relative
+        if path.exists():
+            return path
+
+    return None
 
 
 def extract_chapter_body_text(text: str) -> str:
@@ -952,10 +977,8 @@ def build_chapter_intent(
         "",
     ]
 
-    quickref_path = (project_dir / "references" / "writing-quickref.md") if project_dir else None
-    if quickref_path is None:
-        quickref_path = ROOT_DIR / "references" / "writing-quickref.md"
-    if quickref_path.exists():
+    quickref_path = resolve_reference_file("writing-quickref.md", project_dir=project_dir)
+    if quickref_path is not None:
         lines += ["## Writing Quick Reference", ""]
         lines += quickref_path.read_text(encoding="utf-8").strip().splitlines()
         lines.append("")
@@ -1968,8 +1991,8 @@ def render_review_report_markdown(report: dict[str, Any]) -> str:
     lines += [
         "## 返修参考",
         "",
-        "- `references/anti-ai-rewrite.md`：去 AI 味返修的三档强度、四类病灶和保钩子规则。",
-        "- `references/review-reporting.md`：审阅报告目录、命名和落盘约定。",
+        "- `references/quality/anti-ai-rewrite.md`：去 AI 味返修的三档强度、四类病灶和保钩子规则。",
+        "- `references/quality/review-reporting.md`：审阅报告目录、命名和落盘约定。",
         "",
     ]
     return "\n".join(lines).rstrip() + "\n"
@@ -2813,7 +2836,7 @@ def build_platform_chapter_gate_report(
         elif check["id"] == "dialogue_load" and check["status"] == "warn":
             actions.append("把部分对白说明感转移到动作、环境和关系压力里。")
         elif check["id"] == "ai_density" and check["status"] == "warn":
-            actions.append("按 `references/anti-ai-rewrite.md` 做轻到中档去味返修。")
+            actions.append("按 `references/quality/anti-ai-rewrite.md` 做轻到中档去味返修。")
         elif check["id"] == "pov_boundary" and check["status"] == "warn":
             actions.append("逐段确认信息是否仍贴紧当前 POV，删掉越权宣布。")
 

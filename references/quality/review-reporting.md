@@ -39,5 +39,5 @@
 ## 使用建议
 
 - `review` 跑完后先看阻塞问题，再看风险提示，不要先盯局部文笔
-- 若命中 `ai_tells / explanation_tone / abstract_psychology`，返修时联动 `references/anti-ai-rewrite.md`
+- 若命中 `ai_tells / explanation_tone / abstract_psychology`，返修时联动 `references/quality/anti-ai-rewrite.md`
 - 阶段治理或批量返修时，优先保留报告文件，不要只看终端输出

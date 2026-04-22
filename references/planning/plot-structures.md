@@ -9,7 +9,7 @@
 
 ## 使用前提
 
-先用 `references/main-plot-construction.md` 或大纲里的“主线三步法骨架”确认：
+先用 `references/planning/main-plot-construction.md` 或大纲里的“主线三步法骨架”确认：
 
 - 主角终点站
 - 起爆事件

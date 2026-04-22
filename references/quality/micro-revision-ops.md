@@ -361,9 +361,9 @@ ${target_text}
 
 推荐顺序：
 
-1. 主线问题先看 `references/main-plot-construction.md`
-2. 大纲发虚先看 `references/outline-refinement.md`
-3. 单章执行看 `references/chapter-workflow.md`
+1. 主线问题先看 `references/planning/main-plot-construction.md`
+2. 大纲发虚先看 `references/planning/outline-refinement.md`
+3. 单章执行看 `references/chapter/chapter-workflow.md`
 4. 明确局部问题时，再从本文件挑一个微操作
 
 如果一个问题需要连续调用 2 个以上微操作，说明它大概率不是局部问题，应该回到上层重查。

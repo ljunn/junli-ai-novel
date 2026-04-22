@@ -11,11 +11,28 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 REFERENCES_DIR = ROOT_DIR / "references"
+REFERENCE_TEMPLATE_ALIASES = {
+    "outline-template.md": "planning/outline-template.md",
+    "chapter-plan-template.md": "planning/chapter-plan-template.md",
+    "character-template.md": "planning/character-template.md",
+}
+
+
+def resolve_reference_path(filename: str) -> Path | None:
+    candidates: list[Path] = []
+    mapped = REFERENCE_TEMPLATE_ALIASES.get(filename)
+    if mapped:
+        candidates.append(REFERENCES_DIR / mapped)
+    candidates.append(REFERENCES_DIR / filename)
+    for path in candidates:
+        if path.exists():
+            return path
+    return None
 
 
 def load_template(filename: str, fallback: str) -> str:
-    path = REFERENCES_DIR / filename
-    if path.exists():
+    path = resolve_reference_path(filename)
+    if path is not None:
         return path.read_text(encoding="utf-8")
     return fallback
 

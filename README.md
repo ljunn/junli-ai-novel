@@ -90,7 +90,9 @@ python3 scripts/chapter_pipeline.py governance ./我的小说 \
 junli-ai-novel/
 ├── scripts/
 │   └── chapter_pipeline.py   # 统一命令入口
-├── references/               # 写作方法论与流程说明
+├── references/wiki.md        # 方法论文档总入口
+├── references/hubs/          # 按任务分流的渐进式入口
+├── references/               # 原子写作方法论与流程说明
 ├── rules/novel-lint/         # 规则化文本巡检（AI 套语 / 对白 / 视角越权等）
 ├── 审阅意见/                # review 命令生成的章节审阅报告
 ├── runtime/                  # marketing brief / platform gate 等运行时工件

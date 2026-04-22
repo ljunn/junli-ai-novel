@@ -48,7 +48,7 @@
 
 在本仓库的落点：
 
-- 统一写进 `references/micro-revision-ops.md`
+- 统一写进 `references/quality/micro-revision-ops.md`
 - 单章返修时优先选一个明确操作，不并行乱改
 
 ### 1.3 拆书导入能力
@@ -161,8 +161,8 @@
 
 当前优先项：
 
-1. `references/micro-revision-ops.md`
-2. `references/outline-refinement.md`
+1. `references/quality/micro-revision-ops.md`
+2. `references/planning/outline-refinement.md`
 3. 未来的拆书提炼脚本
 4. 未来的提示词工作台或可视化层
 
