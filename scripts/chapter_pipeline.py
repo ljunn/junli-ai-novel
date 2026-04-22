@@ -23,14 +23,6 @@ try:
     from chapter_text import extract_body_section, is_chapter_file
     from check_chapter_wordcount import check_chapter
     from check_emotion_curve import analyze_chapter_emotion_curve
-    from corpus_index import (
-        available_tags as corpus_available_tags,
-        available_types as corpus_available_types,
-        build_corpus_assets,
-        render_reference_markdown,
-        search_corpus_examples,
-        select_corpus_examples,
-    )
     from extract_thrills import analyze_thrills_and_poisons
     from new_project import create_novel_project, ensure_longform_governance_files
     from update_progress import (
@@ -49,14 +41,6 @@ except ModuleNotFoundError:
     from scripts.chapter_text import extract_body_section, is_chapter_file
     from scripts.check_chapter_wordcount import check_chapter
     from scripts.check_emotion_curve import analyze_chapter_emotion_curve
-    from scripts.corpus_index import (
-        available_tags as corpus_available_tags,
-        available_types as corpus_available_types,
-        build_corpus_assets,
-        render_reference_markdown,
-        search_corpus_examples,
-        select_corpus_examples,
-    )
     from scripts.extract_thrills import analyze_thrills_and_poisons
     from scripts.new_project import create_novel_project, ensure_longform_governance_files
     from scripts.update_progress import (
@@ -192,8 +176,6 @@ COMMAND_LAYER_CATALOG: list[dict[str, Any]] = [
     {
         "group": "Tool",
         "commands": [
-            "corpus-build",
-            "corpus-search",
             "platform-gate",
         ],
     },
@@ -624,7 +606,6 @@ def runtime_paths(project_dir: Path, chapter_num: int) -> dict[str, Path]:
         "runtime_dir": runtime_dir,
         "intent": runtime_dir / f"{prefix}.intent.md",
         "context": runtime_dir / f"{prefix}.context.json",
-        "references": runtime_dir / f"{prefix}.references.md",
         "scenes": runtime_dir / f"{prefix}.scenes.md",
         "rule_stack": runtime_dir / f"{prefix}.rule-stack.yaml",
         "trace": runtime_dir / f"{prefix}.trace.json",
@@ -864,36 +845,12 @@ def find_chapter_file_by_number(project_dir: Path, chapter_num: int | None) -> P
     return None
 
 
-def build_corpus_query_texts(summary: dict, chapter_title: str | None, guidance: str) -> list[str]:
-    query_texts: list[str] = []
-
-    def add(value: str | None) -> None:
-        normalized = first_meaningful_value(value)
-        if normalized and normalized not in query_texts:
-            query_texts.append(normalized)
-
-    add(chapter_title)
-    add(guidance)
-    add(summary.get("phase_goal"))
-    add(summary.get("next_goal"))
-    add(summary.get("protagonist_state"))
-
-    for row in summary.get("active_plots", [])[:3]:
-        cells = [cell.strip() for cell in str(row).split("|") if cell.strip()]
-        for cell in cells[:2]:
-            add(cell)
-
-    return query_texts
-
-
 def build_chapter_intent(
     summary: dict,
     chapter_num: int,
     chapter_title: str | None,
     guidance: str,
     selected_sources: list[dict],
-    pattern_reference_bundle: dict[str, Any],
-    pattern_reference_path: Path | None,
     project_dir: Path | None = None,
 ) -> str:
     goal = first_meaningful_value(guidance, summary.get("phase_goal"), summary.get("next_goal")) or "推进当前主线"
@@ -932,23 +889,6 @@ def build_chapter_intent(
     if not source_lines:
         source_lines = ["- 暂无"]
 
-    pattern_matches = pattern_reference_bundle.get("matches", [])
-    pattern_keywords = pattern_reference_bundle.get("keywords", [])
-    pattern_types = pattern_reference_bundle.get("preferred_types", [])
-    if pattern_reference_path is not None:
-        pattern_lines = [
-            f"- 范本文件：{pattern_reference_path}",
-            f"- 查询词：{' / '.join(str(item) for item in pattern_keywords) if pattern_keywords else '未生成'}",
-            f"- 重点摘录类型：{' / '.join(str(item) for item in pattern_types) if pattern_types else '未设置'}",
-            f"- 命中数量：{len(pattern_matches)}",
-            "- 用法：优先借起势、对白张力和章末停点，不直接改写原句。",
-        ]
-    else:
-        pattern_lines = [
-            "- 未生成本地范本参考文件。",
-            "- 若已补充样本，先执行 `python3 scripts/build_corpus_assets.py`。",
-        ]
-
     must_keep_lines = [f"- {item}" for item in must_keep] or ["- 暂无"]
     must_avoid_lines = [f"- {item}" for item in must_avoid] or ["- 暂无"]
     conflict_lines = [f"- {item}" for item in conflicts] or ["- 暂无"]
@@ -982,9 +922,6 @@ def build_chapter_intent(
         "",
         "## Inputs",
         *source_lines,
-        "",
-        "## Local Pattern References",
-        *pattern_lines,
         "",
     ]
 
@@ -1227,25 +1164,19 @@ def materialize_plan(project_dir: Path, summary: dict, chapter_num: int, chapter
     paths = runtime_paths(project_dir, chapter_num)
     paths["runtime_dir"].mkdir(parents=True, exist_ok=True)
     selected_sources = build_runtime_sources(project_dir, summary, chapter_num, guidance)
-    pattern_reference_bundle = select_corpus_examples(build_corpus_query_texts(summary, chapter_title, guidance), limit=4)
-    paths["references"].write_text(render_reference_markdown(pattern_reference_bundle), encoding="utf-8")
     intent_content = build_chapter_intent(
         summary,
         chapter_num,
         chapter_title,
         guidance,
         selected_sources,
-        pattern_reference_bundle,
-        paths["references"],
         project_dir=project_dir,
     )
     paths["intent"].write_text(intent_content, encoding="utf-8")
     return {
         "chapter": chapter_num,
         "intent_path": str(paths["intent"]),
-        "references_path": str(paths["references"]),
         "goal": first_meaningful_value(guidance, summary.get("phase_goal"), summary.get("next_goal")) or "推进当前主线",
-        "pattern_references": pattern_reference_bundle,
         "selected_sources": selected_sources,
     }
 
@@ -1261,8 +1192,6 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
         "current_volume": summary.get("current_volume", "未记录"),
         "current_phase": summary.get("current_phase", "未记录"),
         "phase_goal": summary.get("phase_goal", "未记录"),
-        "patternReferencesPath": plan_result["references_path"],
-        "patternReferences": plan_result["pattern_references"]["matches"],
         "selectedContext": selected_sources,
     }
     trace_payload = {
@@ -1281,12 +1210,10 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
             "plot/时间线.md",
             "characters/*.md",
         ],
-        "patternReferenceKeywords": plan_result["pattern_references"]["keywords"],
-        "patternReferenceTypes": plan_result["pattern_references"]["preferred_types"],
         "selectedSources": [item["source"] for item in selected_sources],
         "notes": [
             "本章运行时产物由本地项目记忆编译生成，不依赖在线 LLM。",
-            "本地范本命中结果写入 references 文件，优先借结构，不直接抄句子。",
+            "如需同类案例或范本，另行通过知识库 / MCP / 搜索工具查询。",
             "如果本章目标或上下文变化，应重新执行 plan / compose。",
         ],
     }
@@ -1300,12 +1227,10 @@ def materialize_runtime_package(project_dir: Path, summary: dict, chapter_num: i
         "chapter": chapter_num,
         "intent_path": str(paths["intent"]),
         "context_path": str(paths["context"]),
-        "references_path": str(paths["references"]),
         "scenes_path": str(paths["scenes"]),
         "rule_stack_path": str(paths["rule_stack"]),
         "trace_path": str(paths["trace"]),
         "goal": plan_result["goal"],
-        "pattern_references": plan_result["pattern_references"],
         "selected_sources": selected_sources,
     }
 
@@ -2723,8 +2648,6 @@ def handle_next_chapter(args: argparse.Namespace) -> int:
     print(f"- 章节: 第{chapter_num}章")
     print(f"- 已执行: preflight -> resume -> plan -> compose -> start")
     print(f"- 意图文件: {runtime_result['intent_path']}")
-    print(f"- 范本文件: {runtime_result['references_path']}")
-    print(f"- 范本命中: {len(runtime_result['pattern_references']['matches'])}")
     print(f"- 场景卡文件: {runtime_result['scenes_path']}")
     if finished:
         print("- 已执行: finish")
@@ -3087,64 +3010,6 @@ def handle_platform_gate(args: argparse.Namespace) -> int:
     return 0 if report["verdict"] == "pass" else 2 if report["verdict"] == "fail" else 1
 
 
-def handle_corpus_build(args: argparse.Namespace) -> int:
-    stats = build_corpus_assets()
-    if args.json:
-        print(json.dumps(stats, ensure_ascii=False, indent=2))
-        return 0
-
-    print("本地范本资产已构建")
-    print(f"- 文章数: {stats['articles']}")
-    print(f"- 摘录数: {stats['excerpts']}")
-    print(f"- 类型: {' / '.join(stats['types'])}")
-    return 0
-
-
-def handle_corpus_search(args: argparse.Namespace) -> int:
-    if args.list_tags:
-        print("可用标签:")
-        for tag in corpus_available_tags():
-            print(f"- {tag}")
-        return 0
-
-    if args.list_types:
-        print("可用摘录类型:")
-        for item in corpus_available_types():
-            print(f"- {item}")
-        return 0
-
-    results = search_corpus_examples(
-        tag=args.tag,
-        excerpt_type=args.type,
-        keyword=args.keyword,
-        limit=args.limit,
-    )
-    if not results:
-        print("未命中本地范本。")
-        print("- 先执行 corpus-build 确保索引存在")
-        print("- 再用 --list-tags / --list-types 检查覆盖范围")
-        return 0
-
-    for row in results:
-        if row["kind"] == "article":
-            print(f"[ARTICLE] {row['article_id']} 《{row['title']}》")
-            print(f"- 标签: {row['tags']}")
-            print(f"- 路径: {row['file_path']}")
-            print(f"- 摘要: {row['summary_le_200']}")
-            print(f"- 迁移提醒: {row['notes'] or '无'}")
-            print()
-            continue
-
-        print(f"[EXCERPT] {row['excerpt_id']} 《{row['title']}》")
-        print(f"- 类型: {row['excerpt_type']}")
-        print(f"- 标签: {row['tags']}")
-        print(f"- 路径: {row['file_path']}")
-        print(f"- 迁移提醒: {row['notes'] or '无'}")
-        print(row["text"])
-        print()
-    return 0
-
-
 def handle_rules(args: argparse.Namespace) -> int:
     print_layer_catalog("Rule Layer", RULE_LAYER_CATALOG, json_mode=args.json)
     return 0
@@ -3223,8 +3088,6 @@ def handle_plan(args: argparse.Namespace) -> int:
         print("=" * 60)
         print(f"章节: 第{chapter_num}章")
         print(f"意图文件: {result['intent_path']}")
-        print(f"范本文件: {result['references_path']}")
-        print(f"范本命中: {len(result['pattern_references']['matches'])}")
         print(f"目标: {result['goal']}")
     return 0
 
@@ -3246,8 +3109,6 @@ def handle_compose(args: argparse.Namespace) -> int:
         print(f"章节: 第{chapter_num}章")
         print(f"意图文件: {result['intent_path']}")
         print(f"上下文文件: {result['context_path']}")
-        print(f"范本文件: {result['references_path']}")
-        print(f"范本命中: {len(result['pattern_references']['matches'])}")
         print(f"场景卡文件: {result['scenes_path']}")
         print(f"规则栈文件: {result['rule_stack_path']}")
         print(f"轨迹文件: {result['trace_path']}")
@@ -3459,19 +3320,6 @@ def build_parser() -> argparse.ArgumentParser:
     commands_parser = subparsers.add_parser("commands", help="查看 Command 层索引")
     commands_parser.add_argument("--json", action="store_true", help="输出 JSON")
     commands_parser.set_defaults(handler=handle_commands)
-
-    corpus_build_parser = subparsers.add_parser("corpus-build", help="构建本地范本检索资产")
-    corpus_build_parser.add_argument("--json", action="store_true", help="输出 JSON")
-    corpus_build_parser.set_defaults(handler=handle_corpus_build)
-
-    corpus_search_parser = subparsers.add_parser("corpus-search", help="检索本地范本摘录")
-    corpus_search_parser.add_argument("--tag", help="按标签检索")
-    corpus_search_parser.add_argument("--type", help="按摘录类型检索")
-    corpus_search_parser.add_argument("--keyword", help="按关键词检索")
-    corpus_search_parser.add_argument("--limit", type=int, default=10, help="最多返回多少条，默认 10")
-    corpus_search_parser.add_argument("--list-tags", action="store_true", help="列出可用标签")
-    corpus_search_parser.add_argument("--list-types", action="store_true", help="列出可用摘录类型")
-    corpus_search_parser.set_defaults(handler=handle_corpus_search)
 
     init_parser = subparsers.add_parser("init", help="初始化小说项目")
     init_parser.add_argument("project_name", help="项目名称")

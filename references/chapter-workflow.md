@@ -30,7 +30,7 @@ python3 scripts/chapter_pipeline.py next-chapter <项目目录> --chapter-title 
 7. 读取 `docs/章节规划.md`
 8. 读取上一章正文
 9. 读取相关角色与设定
-10. 读取 `runtime/chapter-XXXX.intent.md`、`runtime/chapter-XXXX.references.md`、`context.json`、`scenes.md`、`rule-stack.yaml`
+10. 读取 `runtime/chapter-XXXX.intent.md`、`context.json`、`scenes.md`、`rule-stack.yaml`
 11. 检查活跃伏笔和时间线
 12. 将目标章节在 `docs/章节规划.md` 中标记为“进行中”，并执行 `start`
 

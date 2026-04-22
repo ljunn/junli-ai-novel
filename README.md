@@ -6,7 +6,6 @@
 
 - **立项**：5 问快速建项，主线三步法锁定终点与起爆事件
 - **续写**：自动恢复项目上下文，生成章节意图文件和场景卡，按写法原则约束正文
-- **范本检索**：内置本地范本库，可按开头 / 对白 / 章末检索同类结构参考
 - **质检**：静态预审（字数/情绪曲线/爽毒点/AI 套语检测）+ 语义审稿稿本，默认落盘到 `审阅意见/`
 - **长篇治理**：卷纲 / 阶段规划 / 变更日志 / 定期审计，防止超长篇失控平推
 - **商业化包装**：生成平台上架用的营销 Brief / Prompt Pack
@@ -59,18 +58,7 @@ python3 scripts/chapter_pipeline.py review ./我的小说/manuscript/0001_第一
 
 默认会生成 Markdown 审阅报告到 `./我的小说/审阅意见/`。只想看终端摘要时可加 `--no-write-report`，也可用 `--report-path` 指定输出位置。
 
-### 本地范本检索
-
-```bash
-# 构建本地范本索引
-python3 scripts/build_corpus_assets.py
-
-# 按开头 / 对白 / 章末检索范本
-python3 scripts/search_corpus_examples.py --type '开头钩子' --tag '危机压身' --limit 5
-python3 scripts/chapter_pipeline.py corpus-search --keyword '真假千金' --limit 5
-```
-
-`plan / compose / next-chapter` 会自动把命中的范本写入 `runtime/chapter-XXXX.references.md`。
+如需同类案例、题材范本或结构参考，请通过外部知识库 / MCP / 搜索工具查询；`plan` 生成的 intent 会给出建议查询词。
 
 ### 平台输出门禁
 
@@ -102,8 +90,7 @@ python3 scripts/chapter_pipeline.py governance ./我的小说 \
 junli-ai-novel/
 ├── scripts/
 │   └── chapter_pipeline.py   # 统一命令入口
-├── corpus/                   # 本地范本库与检索索引
-├── references/               # 写作方法论（32 篇，含写法速查）
+├── references/               # 写作方法论与流程说明
 ├── rules/novel-lint/         # 规则化文本巡检（AI 套语 / 对白 / 视角越权等）
 ├── 审阅意见/                # review 命令生成的章节审阅报告
 ├── runtime/                  # marketing brief / platform gate 等运行时工件

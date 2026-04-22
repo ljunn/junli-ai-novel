@@ -74,6 +74,15 @@ class SkillRegressionTests(unittest.TestCase):
             )
             self.assertEqual(next_result.returncode, 0, next_result.stdout + next_result.stderr)
             self.assertTrue((project_dir / "runtime" / "chapter-0001.intent.md").exists())
+            self.assertFalse((project_dir / "runtime" / "chapter-0001.references.md").exists())
+
+    def test_commands_index_no_longer_exposes_corpus_commands(self) -> None:
+        result = run_cli("scripts/chapter_pipeline.py", "commands", "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        all_commands = {command for group in payload for command in group["commands"]}
+        self.assertNotIn("corpus-build", all_commands)
+        self.assertNotIn("corpus-search", all_commands)
 
     def test_next_chapter_applies_runtime_overrides_before_preflight_and_plan(self) -> None:
         with tempfile.TemporaryDirectory(prefix="junli-novel-test-") as tmpdir:
@@ -354,20 +363,6 @@ class SkillRegressionTests(unittest.TestCase):
         result = run_cli("scripts/chapter_pipeline.py", "check", "/tmp/junli-missing-chapter.md")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("文件不存在", result.stdout)
-
-    def test_corpus_keyword_extraction_skips_fragment_noise(self) -> None:
-        sys.path.insert(0, str(REPO_ROOT))
-        try:
-            from scripts.corpus_index import extract_query_keywords
-        finally:
-            sys.path.pop(0)
-
-        keywords = extract_query_keywords(["雨夜开局", "主角雨夜逃命，立住危机和身份疑云"])
-        self.assertIn("雨夜开局", keywords)
-        self.assertIn("主角雨夜逃命", keywords)
-        self.assertNotIn("夜开局", keywords)
-        self.assertNotIn("角雨夜逃", keywords)
-
 
 if __name__ == "__main__":
     unittest.main()
